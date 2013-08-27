@@ -34,7 +34,7 @@
 
 ;; Learn all about TOML here: https://github.com/mojombo/toml
 
-;; Inspired by json.el. thanks!!
+;; Inspired by json.el.  thanks!!
 
 ;;; Code:
 
@@ -55,7 +55,7 @@
 
 notes:
 
- Excluded four hex (\\uXXXX). Do check in `toml:read-escaped-char'")
+ Excluded four hex (\\uXXXX).  Do check in `toml:read-escaped-char'")
 
 (defconst toml->read-table
   (let ((table
@@ -74,7 +74,7 @@ notes:
 
 (defconst toml->regexp-numeric
   "\\(-?[0-9]+[\\.0-9\\]*\\)"
-  "Regular expression for a numeric")
+  "Regular expression for a numeric.")
 
 ;; Error conditions
 
@@ -200,7 +200,7 @@ Move point to the end of the occurrence found, and return point."
     t))
 
 (defun toml:read-char (&optional char-p)
-  "Read character at point. Set point to next point.
+  "Read character at point.  Set point to next point.
 If CHAR-P is nil, return character as string,
 and not nil, return character as char.
 
@@ -211,7 +211,7 @@ Move point a character forward."
       (char-to-string char))))
 
 (defun toml:read-escaped-char ()
-  "Read escaped character at point. Return character as string.
+  "Read escaped character at point.  Return character as string.
 Move point to the end of read characters."
   (unless (eq ?\\ (toml:read-char t))
     (signal 'toml-string-escape-error (list (point))))
@@ -225,7 +225,7 @@ Move point to the end of read characters."
      (t (signal 'toml-string-unicode-escape-error (list (point)))))))
 
 (defun toml:read-string ()
-  "Read string at point that surrounded by double quotation marks.
+  "Read string at point that surrounded by double quotation mark.
 Move point to the end of read strings."
   (unless (eq ?\" (toml:get-char-at-point))
     (signal 'toml-string-error (list (point))))
@@ -243,7 +243,7 @@ Move point to the end of read strings."
     (apply 'concat (nreverse characters))))
 
 (defun toml:read-boolean ()
-  "Read boolean at point. Return t or nil.
+  "Read boolean at point.  Return t or nil.
 Move point to the end of read boolean string."
   (cond
    ((toml:search-forward "true") t)
@@ -266,7 +266,7 @@ Move point to the end of read datetime string."
     (list seconds minutes hour day month year)))
 
 (defun toml:read-numeric ()
-  "Read numeric (integer or float) at point. Return numeric.
+  "Read numeric (integer or float) at point.  Return numeric.
 Move point to the end of read numeric string."
   (unless (toml:search-forward toml->regexp-numeric)
     (signal 'toml-numeric-error (list (point))))
