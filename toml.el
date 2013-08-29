@@ -355,7 +355,8 @@ Move point to the end of read string."
       (progn
         (add-to-list 'hashes (cons key value))))))
 
-(defun toml:parse ()
+(defun toml:read ()
+  "Parse and return the TOML object following point."
   (let (current-keygroup
         current-key
         current-value
@@ -390,5 +391,21 @@ Move point to the end of read string."
 
       (toml:seek-readable-point))
     hashes))
+
+(defun toml:read-from-string (string)
+  "Read the TOML object contained in STRING and return it."
+  (with-temp-buffer
+    (insert string)
+    (goto-char (point-min))
+    (toml:read)))
+
+(defun toml:read-from-file (file)
+  "Read the TOML object contained in FILE and return it."
+  (with-temp-buffer
+    (insert-file-contents file)
+    (goto-char (point-min))
+    (toml:read)))
+
+(provide 'toml)
 
 ;;; toml.el ends here

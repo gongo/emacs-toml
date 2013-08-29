@@ -1,4 +1,5 @@
 (require 'ert)
+(require 'toml)
 
 (defmacro toml-test:buffer-setup (string &rest body)
   `(with-temp-buffer
@@ -272,7 +273,7 @@ c = 1
 \[a\]
 d = 2
 "
-   (let ((parsed (toml:parse)))
+   (let ((parsed (toml:read)))
      (should (equal '("c" . 1) (toml:assoc '("a" "b" "c") parsed)))
      (should (equal '("d" . 2) (toml:assoc '("a" "d") parsed)))
      ))
@@ -314,7 +315,7 @@ hosts = \[
   \"alpha\",
   \"omega\"
 \]"
-   (let ((parsed (toml:parse)))
+   (let ((parsed (toml:read)))
      (should (toml:assoc '("servers" "beta" "dc") parsed))
      (should (toml:assoc '("clients" "data") parsed))
      (should (toml:assoc '("database" "ports") parsed))
@@ -329,7 +330,7 @@ b = 1
 
 \[a\]
 c = 2"
-   (should-error (toml:parse) :type 'toml-redefine-keygroup-error))
+   (should-error (toml:read) :type 'toml-redefine-keygroup-error))
 
   (toml-test:buffer-setup
    "\
@@ -338,5 +339,5 @@ b = 1
 
 \[a.b\]
 c = 2"
-   (should-error (toml:parse) :type 'toml-redefine-key-error))
+   (should-error (toml:read) :type 'toml-redefine-key-error))
 )
