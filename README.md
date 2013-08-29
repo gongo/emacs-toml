@@ -1,6 +1,8 @@
 emacs-toml
 ==========
 
+[![Build Status](https://travis-ci.org/gongo/emacs-toml.png?branch=master)](https://travis-ci.org/gongo/emacs-toml)
+
 `toml.el` is a library for parsing and generating TOML (Tom's Obvious, Minimal Language).
 
 Learn all about TOML here: https://github.com/mojombo/toml
