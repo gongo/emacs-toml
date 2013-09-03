@@ -3,13 +3,23 @@ emacs-toml
 
 [![Build Status](https://travis-ci.org/gongo/emacs-toml.png?branch=master)](https://travis-ci.org/gongo/emacs-toml)
 
-`toml.el` is a library for parsing and generating TOML (Tom's Obvious, Minimal Language).
+`toml.el` is a library for parsing TOML (Tom's Obvious, Minimal Language).
 
-Learn all about TOML here: https://github.com/mojombo/toml
+* Learn all about TOML here: https://github.com/mojombo/toml
+* Support version: [v0.1.0](https://github.com/mojombo/toml/blob/master/versions/toml-v0.1.0.md)
 
 ## Example
 
 Parse the [example.toml](https://github.com/mojombo/toml/blob/master/tests/example.toml) as an example.
+
+```lisp
+(toml:read-from-string "\
+key1 = \"foo\"
+key2 = \"bar\"
+key3 = \"333\"")
+
+;; => '(("key3" . "333") ("key2" . "bar") ("key1" . "foo"))
+```
 
 ```lisp
 (toml:read-from-file "example.toml")

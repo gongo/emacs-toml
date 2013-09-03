@@ -1,4 +1,4 @@
-;;; toml.el --- TOML (Tom's Obvious, Minimal Language) parser and generator
+;;; toml.el --- TOML (Tom's Obvious, Minimal Language) parser
 
 ;; Copyright (C) 2013 by Wataru MIYAGUNI
 
@@ -29,7 +29,7 @@
 
 ;;; Commentary:
 
-;; This is a library for parsing and generating TOML (Tom's Obvious, Minimal
+;; This is a library for parsing TOML (Tom's Obvious, Minimal
 ;; Language).
 
 ;; Learn all about TOML here: https://github.com/mojombo/toml
