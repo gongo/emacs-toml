@@ -119,17 +119,17 @@ notes:
 (put 'toml-key-error 'error-conditions
      '(toml-key-error toml-error error))
 
-(put 'toml-keygroup-error 'error-message "Bad keygroup")
-(put 'toml-keygroup-error 'error-conditions
-     '(toml-keygroup-error toml-error error))
+(put 'toml-table-error 'error-message "Bad table")
+(put 'toml-table-error 'error-conditions
+     '(toml-table-error toml-error error))
 
 (put 'toml-value-error 'error-message "Bad readable value")
 (put 'toml-value-error 'error-conditions
      '(toml-value-error toml-error error))
 
-(put 'toml-redefine-keygroup-error 'error-message "Redefine keygroup error")
-(put 'toml-redefine-keygroup-error 'error-conditions
-     '(toml-redefine-keygroup-error toml-error error))
+(put 'toml-redefine-table-error 'error-message "Redefine table error")
+(put 'toml-redefine-table-error 'error-conditions
+     '(toml-redefine-table-error toml-error error))
 
 (put 'toml-redefine-key-error 'error-message "Redefine key error")
 (put 'toml-redefine-key-error 'error-conditions
@@ -314,19 +314,19 @@ Move point to the end of read string."
           (funcall read-function)
         (signal 'toml-value-error (list (point)))))))
 
-(defun toml:read-keygroup ()
+(defun toml:read-table ()
   (toml:seek-readable-point)
-  (let (keygroup)
+  (let (table)
     (while (and (not (toml:end-of-buffer-p))
                 (char-equal (toml:get-char-at-point) ?\[))
       (if (toml:search-forward "\\[\\([a-zA-Z][a-zA-Z0-9_\\.]*\\)\\]")
-          (let ((keygroup-string (match-string-no-properties 1)))
-            (when (string-match "\\(_\\|\\.\\)\\'" keygroup-string)
-              (signal 'toml-keygroup-error (list (point))))
-            (setq keygroup (split-string (match-string-no-properties 1) "\\.")))
-        (signal 'toml-keygroup-error (list (point))))
+          (let ((table-string (match-string-no-properties 1)))
+            (when (string-match "\\(_\\|\\.\\)\\'" table-string)
+              (signal 'toml-table-error (list (point))))
+            (setq table (split-string (match-string-no-properties 1) "\\.")))
+        (signal 'toml-table-error (list (point))))
       (toml:seek-readable-point))
-    keygroup))
+    table))
 
 (defun toml:read-key ()
   (toml:seek-readable-point)
@@ -338,8 +338,8 @@ Move point to the end of read string."
           key)
       (signal 'toml-key-error (list (point))))))
 
-(defun toml:make-hashes (keygroup key value hashes)
-  (let ((keys (append keygroup (list key))))
+(defun toml:make-hashes (table key value hashes)
+  (let ((keys (append table (list key))))
     (toml:make-hashes-of-alist hashes keys value)))
 
 (defun toml:make-hashes-of-alist (hashes keys value)
@@ -357,34 +357,34 @@ Move point to the end of read string."
 
 (defun toml:read ()
   "Parse and return the TOML object following point."
-  (let (current-keygroup
+  (let (current-table
         current-key
         current-value
-        hashes keygroup-history)
+        hashes table-history)
     (while (not (toml:end-of-buffer-p))
       (toml:seek-readable-point)
 
-      ;; Check re-define keygroup
-      (let ((keygroup (toml:read-keygroup)))
-        (when keygroup
-          (if (and (not (eq keygroup current-keygroup))
-                   (member keygroup keygroup-history))
-              (signal 'toml-redefine-keygroup-error (list (point)))
-            (setq current-keygroup keygroup))))
-      (add-to-list 'keygroup-history current-keygroup)
+      ;; Check re-define table
+      (let ((table (toml:read-table)))
+        (when table
+          (if (and (not (eq table current-table))
+                   (member table table-history))
+              (signal 'toml-redefine-table-error (list (point)))
+            (setq current-table table))))
+      (add-to-list 'table-history current-table)
 
-      (let ((elm (toml:assoc current-keygroup hashes)))
+      (let ((elm (toml:assoc current-table hashes)))
         (when (and elm (not (toml:alistp (cdr elm))))
           (signal 'toml-redefine-key-error (list (point)))))
 
-      ;; Check re-define key (with keygroup)
+      ;; Check re-define key (with table)
       (setq current-key (toml:read-key))
-      (when (toml:assoc (append current-keygroup (list current-key)) hashes)
+      (when (toml:assoc (append current-table (list current-key)) hashes)
         (signal 'toml-redefine-key-error (list (point))))
 
       (setq current-value (toml:read-value))
       (when current-value
-        (setq hashes (toml:make-hashes current-keygroup
+        (setq hashes (toml:make-hashes current-table
                                        current-key
                                        current-value
                                        hashes)))

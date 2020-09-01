@@ -88,28 +88,26 @@ hosts = \[
 In `emacs-toml`, "key groups" and "key" key pattern are as follows:
 
 * `key` = `[a-zA-Z][a-zA-Z0-9_]*`
-* `keygroup` = `[a-zA-Z][a-zA-Z0-9_\\.]*`
+* `table` = `[a-zA-Z][a-zA-Z0-9_\\.]*`
     * The end doesn't end in the period.
 
 ## Test
 
-Use [Cask.el](https://github.com/rejeep/cask.el). follow commands:
+Follow commands:
 
 ```
 $ make test
-cask exec emacs -Q --batch \
+emacs -Q --batch \
 		--load toml.el \
 		--load toml-test.el \
 		-f ert-run-tests-batch-and-exit
-Real cl-lib shadowed by compatibility cl-lib? (/Users/gongo/.emacs.d/elpa/cl-lib-0.3/cl-lib.elc)
-Real cl-lib shadowed by compatibility cl-lib? (/Users/gongo/.emacs.d/elpa/cl-lib-0.3/cl-lib.elc)
 Running 21 tests (2013-08-29 22:33:46+0900)
    passed   1/21  toml-test-error:parse
    passed   2/21  toml-test-error:read-boolean
    passed   3/21  toml-test-error:read-datetime
    passed   4/21  toml-test-error:read-escaped-char
    passed   5/21  toml-test-error:read-key
-   passed   6/21  toml-test-error:read-keygroup
+   passed   6/21  toml-test-error:read-table
    passed   7/21  toml-test-error:read-numeric
    passed   8/21  toml-test-error:read-string
    passed   9/21  toml-test:make-hashes
@@ -124,7 +122,7 @@ Mark set
    passed  13/21  toml-test:read-datetime
    passed  14/21  toml-test:read-escaped-char
    passed  15/21  toml-test:read-key
-   passed  16/21  toml-test:read-keygroup
+   passed  16/21  toml-test:read-table
    passed  17/21  toml-test:read-numeric
    passed  18/21  toml-test:read-string
    passed  19/21  toml-test:seek-beginning-of-next-line
