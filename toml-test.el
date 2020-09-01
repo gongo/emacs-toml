@@ -206,39 +206,39 @@ aiueo"
    (should-error (toml:read-key) :type 'toml-key-error)))
 
 
-(ert-deftest toml-test:read-keygroup ()
+(ert-deftest toml-test:read-table ()
   (toml-test:buffer-setup
    "[aiueo]"
-   (should (equal '("aiueo") (toml:read-keygroup))))
+   (should (equal '("aiueo") (toml:read-table))))
 
   (toml-test:buffer-setup
    "[servers]
     [servers.alpha]
 
        key = value"
-   (should (equal '("servers" "alpha") (toml:read-keygroup)))
+   (should (equal '("servers" "alpha") (toml:read-table)))
    (should (eq ?k (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "[servers]
     [servers.alpha]
     [client]"
-   (should (equal '("client") (toml:read-keygroup)))))
+   (should (equal '("client") (toml:read-table)))))
 
-(ert-deftest toml-test-error:read-keygroup ()
+(ert-deftest toml-test-error:read-table ()
   (toml-test:buffer-setup
    "[]"
-   (should-error (toml:read-keygroup) :type 'toml-keygroup-error))
+   (should-error (toml:read-table) :type 'toml-table-error))
 
   ;; end with underscore "_"
   (toml-test:buffer-setup
    "[foo.bar_]"
-   (should-error (toml:read-keygroup) :type 'toml-keygroup-error))
+   (should-error (toml:read-table) :type 'toml-table-error))
 
   ;; end with period "."
   (toml-test:buffer-setup
    "[foo.bar.]"
-   (should-error (toml:read-keygroup) :type 'toml-keygroup-error)))
+   (should-error (toml:read-table) :type 'toml-table-error)))
 
 (ert-deftest toml-test:make-hashes ()
   (let (hash)
@@ -330,7 +330,7 @@ b = 1
 
 \[a\]
 c = 2"
-   (should-error (toml:read) :type 'toml-redefine-keygroup-error))
+   (should-error (toml:read) :type 'toml-redefine-table-error))
 
   (toml-test:buffer-setup
    "\
@@ -340,4 +340,4 @@ b = 1
 \[a.b\]
 c = 2"
    (should-error (toml:read) :type 'toml-redefine-key-error))
-)
+  )
