@@ -93,16 +93,14 @@ In `emacs-toml`, "key groups" and "key" key pattern are as follows:
 
 ## Test
 
-Use [Cask.el](https://github.com/rejeep/cask.el). follow commands:
+Follow commands:
 
 ```
 $ make test
-cask exec emacs -Q --batch \
+emacs -Q --batch \
 		--load toml.el \
 		--load toml-test.el \
 		-f ert-run-tests-batch-and-exit
-Real cl-lib shadowed by compatibility cl-lib? (/Users/gongo/.emacs.d/elpa/cl-lib-0.3/cl-lib.elc)
-Real cl-lib shadowed by compatibility cl-lib? (/Users/gongo/.emacs.d/elpa/cl-lib-0.3/cl-lib.elc)
 Running 21 tests (2013-08-29 22:33:46+0900)
    passed   1/21  toml-test-error:parse
    passed   2/21  toml-test-error:read-boolean
