@@ -21,7 +21,7 @@
 (ert-deftest toml-test:seek-readable-point ()
   (toml-test:buffer-setup
    "\
-   
+
   # comment line
   # comment line 2 # 3
 aiueo"
@@ -272,10 +272,12 @@ c = 1
 
 \[a\]
 d = 2
+e = []
 "
    (let ((parsed (toml:read)))
      (should (equal '("c" . 1) (toml:assoc '("a" "b" "c") parsed)))
      (should (equal '("d" . 2) (toml:assoc '("a" "d") parsed)))
+     (should (equal '("e" . nil) (toml:assoc '("a" "e") parsed)))
      ))
 
   (toml-test:buffer-setup
