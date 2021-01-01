@@ -21,7 +21,7 @@
 (ert-deftest toml-test:seek-readable-point ()
   (toml-test:buffer-setup
    "\
-   
+
   # comment line
   # comment line 2 # 3
 aiueo"
@@ -180,6 +180,11 @@ aiueo"
    (should (eq ?5 (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
+   "connection-max = name"
+   (should (equal "connection-max" (toml:read-key)))
+   (should (eq ?n (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
    "server12 = name"
    (should (equal "server12" (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point)))))
@@ -210,6 +215,10 @@ aiueo"
   (toml-test:buffer-setup
    "[aiueo]"
    (should (equal '("aiueo") (toml:read-keygroup))))
+
+  (toml-test:buffer-setup
+   "[ai-ueo]"
+   (should (equal '("ai-ueo") (toml:read-keygroup))))
 
   (toml-test:buffer-setup
    "[servers]
