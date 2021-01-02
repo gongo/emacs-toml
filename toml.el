@@ -383,11 +383,10 @@ Move point to the end of read string."
         (signal 'toml-redefine-key-error (list (point))))
 
       (setq current-value (toml:read-value))
-      (when current-value
-        (setq hashes (toml:make-hashes current-keygroup
+      (setq hashes (toml:make-hashes current-keygroup
                                        current-key
                                        current-value
-                                       hashes)))
+                                       hashes))
 
       (toml:seek-readable-point))
     hashes))
