@@ -21,7 +21,7 @@
 (ert-deftest toml-test:seek-readable-point ()
   (toml-test:buffer-setup
    "\
-   
+
   # comment line
   # comment line 2 # 3
 aiueo"
@@ -269,13 +269,17 @@ aiueo"
    "\
 \[a.b\]
 c = 1
+g = { bar = 4711, baz = \"foo\" }
 
 \[a\]
 d = 2
+f = { foo = 2342 }
 "
    (let ((parsed (toml:read)))
      (should (equal '("c" . 1) (toml:assoc '("a" "b" "c") parsed)))
      (should (equal '("d" . 2) (toml:assoc '("a" "d") parsed)))
+     (should (equal '("f" . (("foo" . 2342))) (toml:assoc '("a" "f") parsed)))
+     (should (equal '("g" ("bar" . 4711) ("baz" . "foo")) (toml:assoc '("a" "b" "g") parsed)))
      ))
 
   (toml-test:buffer-setup
