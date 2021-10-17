@@ -205,6 +205,37 @@ aiueo"
    "connection_ = 5000"
    (should-error (toml:read-key) :type 'toml-key-error)))
 
+(ert-deftest toml-test:read-array ()
+  (toml-test:buffer-setup
+   "[]"
+   (should (equal [] (toml:read-array))))
+
+  (toml-test:buffer-setup
+   "[1, 2, 3]"
+   (should (equal [1 2 3] (toml:read-array))))
+
+  (toml-test:buffer-setup
+   "[ [1, 2], [3, 4, 5] ]"
+   (should (equal [[1 2] [3 4 5]] (toml:read-array))))
+
+  (toml-test:buffer-setup
+   "[
+      1,
+      2,
+    ]"
+   (should (equal [1 2] (toml:read-array))))
+  )
+
+(ert-deftest toml-test-error:read-array ()
+  (toml-test:buffer-setup
+   "[1 2 3]"
+   (should-error (toml:read-array) :type 'toml-array-error))
+
+  ;; FIXME: Data types may not be mixed
+  ;; (toml-test:buffer-setup
+  ;;  "[1, 0.2]"
+  ;;  (should-error (toml:read-array) :type 'toml-array-error))
+  )
 
 (ert-deftest toml-test:read-table ()
   (toml-test:buffer-setup

@@ -64,23 +64,23 @@ hosts = \[
 \]")
 
 ;; =>  '(
-;;        ("clients"
-;;          ("hosts" "alpha" "omega")
-;;          ("data" ("gamma" "delta") (1 2)))
-;;        ("servers"
-;;          ("beta" ("dc" . "eqdc10") ("ip" . "10.0.0.2"))
-;;          ("alpha" ("dc" . "eqdc10") ("ip" . "10.0.0.1")))
-;;        ("database"
-;;          ("enabled" . t)
-;;          ("connection_max" . 5000)
-;;          ("ports" 8001 8001 8002)
-;;          ("server" . "192.168.1.1"))
-;;        ("owner"
-;;          ("dob" 0 32 7 27 5 1979)
-;;          ("bio" . "GitHub Cofounder & CEO\\nLikes tater tots and beer.")
-;;          ("organization" . "GitHub")
-;;          ("name" . "Tom Preston-Werner"))
-;;        ("title" . "TOML Example"))
+;;       ("clients"
+;;        ("hosts" . ["alpha" "omega"])
+;;        ("data" . [["gamma" "delta"] [1 2]]))
+;;       ("servers"
+;;        ("beta" ("dc" . "eqdc10") ("ip" . "10.0.0.2"))
+;;        ("alpha" ("dc" . "eqdc10") ("ip" . "10.0.0.1")))
+;;       ("database"
+;;        ("enabled" . t)
+;;        ("connection_max" . 5000)
+;;        ("ports" . [8001 8001 8002])
+;;        ("server" . "192.168.1.1"))
+;;       ("owner"
+;;        ("dob" 0 32 7 27 5 1979)
+;;        ("bio" . "GitHub Cofounder & CEO\\nLikes tater tots and beer.")
+;;        ("organization" . "GitHub")
+;;        ("name" . "Tom Preston-Werner"))
+;;       ("title" . "TOML Example"))
 ```
 
 ## Spec
