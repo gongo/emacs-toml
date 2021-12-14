@@ -156,12 +156,12 @@ notes:
       element)))
 
 (defun toml:alistp (alist)
-  (if (listp alist)
-      (catch 'break
-        (dolist (al alist)
-          (unless (consp al) (throw 'break nil)))
-        t)
-    nil))
+  "Return t if ALIST is a list of association lists, nil otherwise."
+  (when (listp alist)
+    (catch 'break
+      (dolist (al alist)
+        (unless (consp al) (throw 'break nil)))
+      t)))
 
 (defun toml:end-of-line-p ()
   (looking-at "$"))
