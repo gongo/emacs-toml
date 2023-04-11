@@ -282,15 +282,15 @@ g = { bar = 4711, baz = \"foo\" }
 
 \[a\]
 d = 2
-f = { foo = 2342 }
 e = []
+f = { foo = 2342 }
 "
    (let ((parsed (toml:read)))
      (should (equal '("c" . 1) (toml:assoc '("a" "b" "c") parsed)))
      (should (equal '("d" . 2) (toml:assoc '("a" "d") parsed)))
+     (should (equal '("e" . nil) (toml:assoc '("a" "e") parsed)))
      (should (equal '("f" . (("foo" . 2342))) (toml:assoc '("a" "f") parsed)))
      (should (equal '("g" ("bar" . 4711) ("baz" . "foo")) (toml:assoc '("a" "b" "g") parsed)))
-     (should (equal '("e" . nil) (toml:assoc '("a" "e") parsed)))
      ))
 
   (toml-test:buffer-setup
