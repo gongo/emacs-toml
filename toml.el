@@ -340,7 +340,7 @@ Move point to the end of read string."
   (let (keygroup)
     (while (and (not (toml:end-of-buffer-p))
                 (char-equal (toml:get-char-at-point) ?\[))
-      (if (toml:search-forward "\\[\\([a-zA-Z][a-zA-Z0-9_\\.]*\\)\\]")
+      (if (toml:search-forward "\\[\\([a-zA-Z][a-zA-Z0-9_\\.-]*\\)\\]")
           (let ((keygroup-string (match-string-no-properties 1)))
             (when (string-match "\\(_\\|\\.\\)\\'" keygroup-string)
               (signal 'toml-keygroup-error (list (point))))
@@ -352,7 +352,7 @@ Move point to the end of read string."
 (defun toml:read-key ()
   (toml:seek-readable-point)
   (if (toml:end-of-buffer-p) nil
-    (if (toml:search-forward "\\([a-zA-Z][a-zA-Z0-9_]*\\) *= *")
+    (if (toml:search-forward "\\([a-zA-Z][a-zA-Z0-9_-]*\\) *= *")
         (let ((key (match-string-no-properties 1)))
           (when (string-match "_\\'" key)
             (signal 'toml-key-error (list (point))))
@@ -404,11 +404,10 @@ Move point to the end of read string."
         (signal 'toml-redefine-key-error (list (point))))
 
       (setq current-value (toml:read-value))
-      (when current-value
-        (setq hashes (toml:make-hashes current-keygroup
+      (setq hashes (toml:make-hashes current-keygroup
                                        current-key
                                        current-value
-                                       hashes)))
+                                       hashes))
 
       (toml:seek-readable-point))
     hashes))

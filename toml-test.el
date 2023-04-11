@@ -180,6 +180,11 @@ aiueo"
    (should (eq ?5 (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
+   "connection-max = name"
+   (should (equal "connection-max" (toml:read-key)))
+   (should (eq ?n (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
    "server12 = name"
    (should (equal "server12" (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point)))))
@@ -210,6 +215,10 @@ aiueo"
   (toml-test:buffer-setup
    "[aiueo]"
    (should (equal '("aiueo") (toml:read-keygroup))))
+
+  (toml-test:buffer-setup
+   "[ai-ueo]"
+   (should (equal '("ai-ueo") (toml:read-keygroup))))
 
   (toml-test:buffer-setup
    "[servers]
@@ -274,12 +283,14 @@ g = { bar = 4711, baz = \"foo\" }
 \[a\]
 d = 2
 f = { foo = 2342 }
+e = []
 "
    (let ((parsed (toml:read)))
      (should (equal '("c" . 1) (toml:assoc '("a" "b" "c") parsed)))
      (should (equal '("d" . 2) (toml:assoc '("a" "d") parsed)))
      (should (equal '("f" . (("foo" . 2342))) (toml:assoc '("a" "f") parsed)))
      (should (equal '("g" ("bar" . 4711) ("baz" . "foo")) (toml:assoc '("a" "b" "g") parsed)))
+     (should (equal '("e" . nil) (toml:assoc '("a" "e") parsed)))
      ))
 
   (toml-test:buffer-setup
