@@ -97,7 +97,7 @@ aiueo"
    (should (null (toml:read-boolean)))
    (should (toml:end-of-line-p))))
 
-(ert-deftest toml-test-error:read-boolean ()
+(ert-deftest toml-test-error:read-boolean-error ()
   (toml-test:buffer-setup
    "truu"
    (should-error (toml:read-boolean) :type 'toml-boolean-error))
