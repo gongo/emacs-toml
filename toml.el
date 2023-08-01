@@ -248,7 +248,7 @@ Move point to the end of read strings."
 Move point to the end of read boolean string."
   (cond
    ((toml:search-forward "true") t)
-   ((toml:search-forward "false") nil)
+   ((toml:search-forward "false") :false)
    (t
     (signal 'toml-boolean-error (list (point))))))
 
@@ -305,7 +305,8 @@ Move point to the end of read string."
               (toml:seek-readable-point))
           (signal 'toml-array-error (list (point))))))
     (forward-char)
-    (nreverse elements)))
+    (vconcat
+     (nreverse elements))))
 
 (defun toml:read-inline-table ()
   (unless (eq ?{ (toml:get-char-at-point))

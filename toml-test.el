@@ -94,10 +94,10 @@ aiueo"
 
   (toml-test:buffer-setup
    "false"
-   (should (null (toml:read-boolean)))
+   (should (equal :false (toml:read-boolean)))
    (should (toml:end-of-line-p))))
 
-(ert-deftest toml-test-error:read-boolean ()
+(ert-deftest toml-test-error:read-boolean-error ()
   (toml-test:buffer-setup
    "truu"
    (should-error (toml:read-boolean) :type 'toml-boolean-error))
@@ -282,13 +282,13 @@ g = { bar = 4711, baz = \"foo\" }
 
 \[a\]
 d = 2
-e = []
+e = [1, 2]
 f = { foo = 2342 }
 "
    (let ((parsed (toml:read)))
      (should (equal '("c" . 1) (toml:assoc '("a" "b" "c") parsed)))
      (should (equal '("d" . 2) (toml:assoc '("a" "d") parsed)))
-     (should (equal '("e" . nil) (toml:assoc '("a" "e") parsed)))
+     (should (equal '("e" . [1 2]) (toml:assoc '("a" "e") parsed)))
      (should (equal '("f" . (("foo" . 2342))) (toml:assoc '("a" "f") parsed)))
      (should (equal '("g" ("bar" . 4711) ("baz" . "foo")) (toml:assoc '("a" "b" "g") parsed)))
      ))
@@ -334,6 +334,20 @@ hosts = \[
      (should (toml:assoc '("servers" "beta" "dc") parsed))
      (should (toml:assoc '("clients" "data") parsed))
      (should (toml:assoc '("database" "ports") parsed))
+     )))
+
+(ert-deftest toml-test:parse-empty ()
+  (toml-test:buffer-setup
+   "\
+\[empty\]
+l = []
+d = {}
+f = false
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("l" . []) (toml:assoc '("empty" "l") parsed)))
+     (should (equal '("d" . nil) (toml:assoc '("empty" "d") parsed)))
+     (should (equal '("f" . :false) (toml:assoc '("empty" "f") parsed)))
      )))
 
 
