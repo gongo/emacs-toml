@@ -41,7 +41,7 @@
 (require 'parse-time)
 
 (defconst toml->special-escape-characters
-  '(?b ?t ?n ?f ?r ?\" ?\/ ?\\)
+  '(?b ?t ?n ?f ?r ?\" ?\' ?\/ ?\\)
   "Characters which are escaped in TOML.
 
 \\b     - backspace       (U+0008)
@@ -49,9 +49,10 @@
 \\n     - linefeed        (U+000A)
 \\f     - form feed       (U+000C)
 \\r     - carriage return (U+000D)
-\\\"     - quote           (U+0022)
-\\\/     - slash           (U+002F)
-\\\\     - backslash       (U+005C)
+\\\"    - quote           (U+0022)
+\\\'    - single-quote    (U+0027)
+\\\/    - slash           (U+002F)
+\\\\    - backslash       (U+005C)
 
 notes:
 
@@ -63,7 +64,8 @@ notes:
            (?f  . toml:read-boolean)
            (?\[ . toml:read-array)
 	   (?{  . toml:read-inline-table)
-           (?\" . toml:read-string))))
+           (?\" . toml:read-string)
+           (?\' . toml:read-string))))
     (mapc (lambda (char)
             (push (cons char 'toml:read-start-with-number) table))
           '(?- ?0 ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9))
@@ -228,11 +230,11 @@ Move point to the end of read characters."
 (defun toml:read-string ()
   "Read string at point that surrounded by double quotation mark.
 Move point to the end of read strings."
-  (unless (eq ?\" (toml:get-char-at-point))
+  (unless (member (toml:get-char-at-point) '(?\" ?\'))
     (signal 'toml-string-error (list (point))))
   (let ((characters '())
         (char (toml:read-char)))
-    (while (not (eq char ?\"))
+    (while (not (member char '(?\" ?\')))
       (when (toml:end-of-line-p)
         (signal 'toml-string-error (list (point))))
       (push (if (eq char ?\\)
