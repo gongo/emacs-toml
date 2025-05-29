@@ -86,7 +86,7 @@ aiueo"
      str
      (should-error (toml:read-string) :type 'toml-string-error))))
 
-(ert-deftest toml-test-error:read-boolean ()
+(ert-deftest toml-test:read-boolean ()
   (toml-test:buffer-setup
    "true"
    (should (equal t (toml:read-boolean)))
