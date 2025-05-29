@@ -70,7 +70,13 @@ notes:
     table))
 
 (defconst toml->regexp-datetime
-  "\\([0-9]\\{4\\}\\)-\\(0[1-9]\\|1[0-2]\\)-\\(0[1-9]\\|[1-2][0-9]\\|3[0-1]\\)T\\([0-1][0-9]\\|2[0-4]\\):\\([0-5][0-9]\\):\\([0-5][0-9]\\)Z"
+  "\
+\\([0-9]\\{4\\}\\)-\
+\\(0[1-9]\\|1[0-2]\\)-\
+\\(0[1-9]\\|[1-2][0-9]\\|3[0-1]\\)T\
+\\([0-1][0-9]\\|2[0-4]\\):\
+\\([0-5][0-9]\\):\
+\\([0-5][0-9]\\)Z"
   "Regular expression for a datetime (Zulu time format).")
 
 (defconst toml->regexp-numeric
@@ -151,18 +157,15 @@ notes:
       element)))
 
 (defun toml:alistp (alist)
-  (if (listp alist)
-      (catch 'break
-        (dolist (al alist)
-          (unless (consp al) (throw 'break nil)))
-        t)
-    nil))
+  "Return t if ALIST is a list of association lists, nil otherwise."
+  (when (listp alist)
+    (catch 'break
+      (dolist (al alist)
+        (unless (consp al) (throw 'break nil)))
+      t)))
 
 (defun toml:end-of-line-p ()
   (looking-at "$"))
-
-(defun toml:end-of-buffer-p ()
-  (eq (point) (point-max)))
 
 (defun toml:get-char-at-point ()
   (char-after (point)))
@@ -180,10 +183,10 @@ Skip target:
 - whitespace (Tab or Space)
 - comment line (start with hash symbol)"
   (toml:seek-non-whitespace)
-  (while (and (not (toml:end-of-buffer-p))
+  (while (and (not (eobp))
               (char-equal (toml:get-char-at-point) ?#))
     (end-of-line)
-    (unless (toml:end-of-buffer-p)
+    (unless (eobp)
       (toml:seek-beginning-of-next-line)
       (toml:seek-non-whitespace))))
 
@@ -329,7 +332,7 @@ Move point to the end of read string."
 
 (defun toml:read-value ()
   (toml:seek-readable-point)
-  (if (toml:end-of-buffer-p) nil
+  (if (eobp) nil
     (let ((read-function (cdr (assq (toml:get-char-at-point) toml->read-table))))
       (if (functionp read-function)
           (funcall read-function)
@@ -338,7 +341,7 @@ Move point to the end of read string."
 (defun toml:read-keygroup ()
   (toml:seek-readable-point)
   (let (keygroup)
-    (while (and (not (toml:end-of-buffer-p))
+    (while (and (not (eobp))
                 (char-equal (toml:get-char-at-point) ?\[))
       (if (toml:search-forward "\\[\\([a-zA-Z][a-zA-Z0-9_\\.-]*\\)\\]")
           (let ((keygroup-string (match-string-no-properties 1)))
@@ -351,7 +354,7 @@ Move point to the end of read string."
 
 (defun toml:read-key ()
   (toml:seek-readable-point)
-  (if (toml:end-of-buffer-p) nil
+  (if (eobp) nil
     (if (toml:search-forward "\\([a-zA-Z][a-zA-Z0-9_-]*\\) *= *")
         (let ((key (match-string-no-properties 1)))
           (when (string-match "_\\'" key)
@@ -382,7 +385,7 @@ Move point to the end of read string."
         current-key
         current-value
         hashes keygroup-history)
-    (while (not (toml:end-of-buffer-p))
+    (while (not (eobp))
       (toml:seek-readable-point)
 
       ;; Check re-define keygroup
