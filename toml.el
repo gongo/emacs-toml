@@ -57,7 +57,7 @@ notes:
 
  Excluded four hex (\\uXXXX).  Do check in `toml:read-escaped-char'")
 
-(defconst toml->read-table
+(defconst toml->parse-dispatch-table
   (let ((table
          '((?t  . toml:read-boolean)
            (?f  . toml:read-boolean)
@@ -177,7 +177,7 @@ notes:
   (beginning-of-line))
 
 (defun toml:seek-readable-point ()
-  "Move point forward, stopping readable point. (toml->read-table).
+  "Move point forward, stopping readable point. (toml->parse-dispatch-table).
 
 Skip target:
 
@@ -348,7 +348,7 @@ Move point to the end of read string."
 (defun toml:read-value ()
   (toml:seek-readable-point)
   (if (eobp) nil
-    (let ((read-function (cdr (assq (toml:get-char-at-point) toml->read-table))))
+    (let ((read-function (cdr (assq (toml:get-char-at-point) toml->parse-dispatch-table))))
       (if (functionp read-function)
           (funcall read-function)
         (signal 'toml-value-error (list (point)))))))
