@@ -245,25 +245,48 @@ aiueo"
 (ert-deftest toml-test:read-table ()
   (toml-test:buffer-setup
    "[aiueo]"
-   (should (equal '("aiueo") (toml:read-table))))
+   (should (equal '(:type single :keys ("aiueo")) (toml:read-table))))
 
   (toml-test:buffer-setup
    "[ai-ueo]"
-   (should (equal '("ai-ueo") (toml:read-table))))
+   (should (equal '(:type single :keys ("ai-ueo")) (toml:read-table))))
 
   (toml-test:buffer-setup
    "[servers]
     [servers.alpha]
 
        key = value"
-   (should (equal '("servers" "alpha") (toml:read-table)))
+   (should (equal '(:type single :keys ("servers" "alpha")) (toml:read-table)))
    (should (eq ?k (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "[servers]
     [servers.alpha]
     [client]"
-   (should (equal '("client") (toml:read-table)))))
+   (should (equal '(:type single :keys ("client")) (toml:read-table))))
+
+  (toml-test:buffer-setup
+   "[[aiueo]]"
+   (should (equal '(:type array :keys ("aiueo")) (toml:read-table))))
+
+  (toml-test:buffer-setup
+   "[[ai-ueo]]"
+   (should (equal '(:type array :keys ("ai-ueo")) (toml:read-table))))
+
+  (toml-test:buffer-setup
+   "[[servers]]
+    [[servers.alpha]]
+
+       key = value"
+   (should (equal '(:type array :keys ("servers")) (toml:read-table)))
+   (should (eq ?\[ (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "[[servers]]
+    [[servers.alpha]]
+    [[client]]"
+   (should (equal '(:type array :keys ("servers")) (toml:read-table))))
+  )
 
 (ert-deftest toml-test-error:read-table ()
   (toml-test:buffer-setup

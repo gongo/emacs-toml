@@ -354,18 +354,33 @@ Move point to the end of read string."
         (signal 'toml-value-error (list (point)))))))
 
 (defun toml:read-table ()
+  "Parse TOML table header and return table type and keys.
+Returns a plist with :type (single or array) and :keys (list of key names).
+Handles both regular tables [table.name] and array of tables [[table.name]].
+
+Behavior differences:
+- :type single (for table [xxx])
+  - If no key/value pairs are defined, continue to next table
+- :type array (for array of table [[xxx]])
+  - Stop reading regardless of key/value presence (for empty table representation)"
   (toml:seek-readable-point)
-  (let (table)
+  (let (table-keys table-type)
     (while (and (not (eobp))
+		(or (null table-type) (eq table-type 'single))
                 (char-equal (toml:get-char-at-point) ?\[))
-      (if (toml:search-forward "\\[\\([a-zA-Z][a-zA-Z0-9_\\.-]*\\)\\]")
-          (let ((table-string (match-string-no-properties 1)))
+      (if (toml:search-forward "\\(\\[\\{1,2\\}\\)\\([a-zA-Z][a-zA-Z0-9_\\.-]*\\)\\(\\]\\{1,2\\}\\)")
+	  (let* ((brackets-before (match-string-no-properties 1)) ;;  "["  in "[xxx]"
+		 (brackets-after (match-string-no-properties 3))  ;;  "]"  in "[xxx]"
+		 (table-string (match-string-no-properties 2)))   ;; "xxx" in "[xxx]"
             (when (string-match "\\(_\\|\\.\\)\\'" table-string)
               (signal 'toml-table-error (list (point))))
-            (setq table (split-string (match-string-no-properties 1) "\\.")))
+            (unless (= (length brackets-before) (length brackets-after))
+              (signal 'toml-table-error (list (point))))
+            (setq table-keys (split-string table-string "\\."))
+	    (setq table-type (if (string= brackets-before "[[") 'array 'single)))
         (signal 'toml-table-error (list (point))))
       (toml:seek-readable-point))
-    table))
+    (list :type table-type :keys table-keys)))
 
 (defun toml:read-key ()
   (toml:seek-readable-point)
@@ -404,12 +419,19 @@ Move point to the end of read string."
       (toml:seek-readable-point)
 
       ;; Check re-define table
-      (let ((table (toml:read-table)))
-        (when table
-          (if (and (not (eq table current-table))
-                   (member table table-history))
+      (cl-destructuring-bind (&key type keys) (toml:read-table)
+	(cond
+         ((eq type 'single)
+          (if (and (not (eq keys current-table))
+                   (member keys table-history))
               (signal 'toml-redefine-table-error (list (point)))
-            (setq current-table table))))
+            (setq current-table keys)))
+	 ((eq type 'array)
+	  ;; noop
+	  )
+	 (t
+	  ;; noop
+	 )))
       (add-to-list 'table-history current-table)
 
       (let ((elm (toml:assoc current-table hashes)))
