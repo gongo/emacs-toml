@@ -1,3 +1,5 @@
+(add-to-list 'load-path (file-name-directory (or load-file-name buffer-file-name)))
+
 (require 'ert)
 (require 'toml)
 
@@ -356,3 +358,25 @@ b = 1
 c = 2"
    (should-error (toml:read) :type 'toml-redefine-key-error))
 )
+
+(ert-deftest toml-test:read-literal-string ()
+  (toml-test:buffer-setup
+   "'Literal string with no escapes.'"
+   (should (equal "Literal string with no escapes." (toml:read-literal-string)))
+   (should (toml:end-of-line-p))))
+
+(ert-deftest toml-test:read-empty-literal-string ()
+  (toml-test:buffer-setup
+   "''"
+   (should (equal "" (toml:read-literal-string)))
+   (should (toml:end-of-line-p))))
+
+(ert-deftest toml-test-error:read-literal-string ()
+  (dolist (str '("noquotes"               ;; not quoted
+                 "'unterminated string"   ;; no closing quote
+                 " 'starts with space'"   ;; space before quote
+                 "'''"                    ;; multiple quotes not supported here
+                 ))
+    (toml-test:buffer-setup
+     str
+     (should-error (toml:read-literal-string) :type 'toml-string-error))))
