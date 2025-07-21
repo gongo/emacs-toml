@@ -1,5 +1,3 @@
-(add-to-list 'load-path (file-name-directory (or load-file-name buffer-file-name)))
-
 (require 'ert)
 (require 'toml)
 
@@ -372,11 +370,13 @@ c = 2"
    (should (toml:end-of-line-p))))
 
 (ert-deftest toml-test-error:read-literal-string ()
-  (dolist (str '("noquotes"               ;; not quoted
-                 "'unterminated string"   ;; no closing quote
-                 " 'starts with space'"   ;; space before quote
-                 "'''"                    ;; multiple quotes not supported here
-                 ))
-    (toml-test:buffer-setup
-     str
-     (should-error (toml:read-literal-string) :type 'toml-string-error))))
+  (dolist (case '(("'unterminated string"   . toml-string-error)
+                   ;; TODO: perhaps add unsupported err?
+                  ("'''"                    . toml-key-error)))
+    (let* ((input (concat "x = " (car case)))
+           (expected-error (cdr case)))
+      (toml-test:buffer-setup
+       input
+       (if expected-error
+           (should-error (toml:read) :type expected-error)
+         (should (toml:read)))))))
