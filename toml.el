@@ -53,7 +53,6 @@
 \\\/     - slash           (U+002F)
 \\\\     - backslash       (U+005C)
 
-
 notes:
 
  Excluded four hex (\\uXXXX).  Do check in `toml:read-escaped-char'")
@@ -63,7 +62,7 @@ notes:
          '((?t  . toml:read-boolean)
            (?f  . toml:read-boolean)
            (?\[ . toml:read-array)
-	       (?{  . toml:read-inline-table)
+	   (?{  . toml:read-inline-table)
            (?\" . toml:read-string)
            (?\' . toml:read-literal-string))))
     (mapc (lambda (char)
@@ -178,7 +177,7 @@ notes:
   (beginning-of-line))
 
 (defun toml:seek-readable-point ()
-  "Move point forward, stopping readable point.  (toml->read-table).
+  "Move point forward, stopping readable point. (toml->read-table).
 
 Skip target:
 
