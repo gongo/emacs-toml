@@ -63,7 +63,8 @@ notes:
            (?f  . toml:read-boolean)
            (?\[ . toml:read-array)
 	   (?{  . toml:read-inline-table)
-           (?\" . toml:read-string))))
+           (?\" . toml:read-string)
+           (?\' . toml:read-literal-string))))
     (mapc (lambda (char)
             (push (cons char 'toml:read-start-with-number) table))
           '(?- ?0 ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9))
@@ -245,6 +246,20 @@ Move point to the end of read strings."
       (setq char (toml:get-char-at-point)))
     (forward-char)
     (apply 'concat (nreverse characters))))
+
+(defun toml:read-literal-string ()
+  "Read TOML literal string (enclosed in single quotes) at point."
+  (unless (eq ?\' (toml:get-char-at-point))
+    (signal 'toml-string-error (list (point))))
+  (forward-char)
+  (let ((characters '())
+        char)
+    (while (not (eq (setq char (toml:get-char-at-point)) ?\'))
+      (when (toml:end-of-line-p)
+        (signal 'toml-string-error (list (point))))
+      (push (toml:read-char) characters))
+    (forward-char)
+    (apply #'concat (nreverse characters))))
 
 (defun toml:read-boolean ()
   "Read boolean at point.  Return t or nil.

@@ -356,3 +356,27 @@ b = 1
 c = 2"
    (should-error (toml:read) :type 'toml-redefine-key-error))
 )
+
+(ert-deftest toml-test:read-literal-string ()
+  (toml-test:buffer-setup
+   "'Literal string with no escapes.'"
+   (should (equal "Literal string with no escapes." (toml:read-literal-string)))
+   (should (toml:end-of-line-p))))
+
+(ert-deftest toml-test:read-empty-literal-string ()
+  (toml-test:buffer-setup
+   "''"
+   (should (equal "" (toml:read-literal-string)))
+   (should (toml:end-of-line-p))))
+
+(ert-deftest toml-test-error:read-literal-string ()
+  (dolist (case '(("'unterminated string"   . toml-string-error)
+                   ;; TODO: perhaps add unsupported err?
+                  ("'''"                    . toml-key-error)))
+    (let* ((input (concat "x = " (car case)))
+           (expected-error (cdr case)))
+      (toml-test:buffer-setup
+       input
+       (if expected-error
+           (should-error (toml:read) :type expected-error)
+         (should (toml:read)))))))
