@@ -392,22 +392,30 @@ Behavior differences:
           key)
       (signal 'toml-key-error (list (point))))))
 
-(defun toml:make-hashes (table key value hashes)
-  (let ((keys (append table (list key))))
-    (toml:make-hashes-of-alist hashes keys value)))
+(defun toml:make-table-hashes (table-keys key value hashes)
+  "Add a VALUE to HASHES at the path specified by TABLE-KEYS and KEY, creating nested tables as needed.
 
-(defun toml:make-hashes-of-alist (hashes keys value)
-  (let* ((key (car keys))
-         (descendants (cdr keys))
-         (element (assoc key hashes))
-         (children (cdr element)))
-    (setq hashes (delete element hashes))
-    (if descendants
-        (progn
-          (setq element (toml:make-hashes-of-alist children descendants value))
-          (add-to-list 'hashes (cons key element)))
-      (progn
-        (add-to-list 'hashes (cons key value))))))
+Usage:
+  (setq hash nil)
+  (setq hash (toml:make-table-hashes '(\"servers\" \"alpha\") \"ip\" \"192.0.2.1\" hash))
+  ;; => ((\"servers\" (\"alpha\" (\"ip\" . \"192.0.2.1\"))))
+  (setq hash (toml:make-table-hashes '(\"servers\" \"alpha\") \"dc\" \"eqdc10\" hash))
+  ;; => ((\"servers\" (\"alpha\" (\"dc\" . \"eqdc10\") (\"ip\" . \"192.0.2.1\"))))"
+  (letrec ((build-nested (lambda (hash-data keys-list val)
+                           (if (null keys-list)
+                               val
+                             (let* ((current-key (car keys-list))
+                                    (descendants (cdr keys-list))
+                                    (element (assoc current-key hash-data))
+                                    (children (cdr element)))
+                               (setq hash-data (delete element hash-data))
+                               (if descendants
+                                   (let ((new-children (funcall build-nested children descendants val)))
+                                     (add-to-list 'hash-data (cons current-key new-children)))
+                                 (add-to-list 'hash-data (cons current-key val)))
+                               hash-data)))))
+    (let ((keys (append table-keys (list key))))
+      (funcall build-nested hashes keys value))))
 
 (defun toml:read ()
   "Parse and return the TOML object following point."
@@ -444,10 +452,10 @@ Behavior differences:
         (signal 'toml-redefine-key-error (list (point))))
 
       (setq current-value (toml:read-value))
-      (setq hashes (toml:make-hashes current-table
-                                     current-key
-                                     current-value
-                                     hashes))
+      (setq hashes (toml:make-table-hashes current-table
+                                           current-key
+                                           current-value
+                                           hashes))
 
       (toml:seek-readable-point))
     hashes))

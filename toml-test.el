@@ -303,28 +303,28 @@ aiueo"
    "[foo.bar.]"
    (should-error (toml:read-table) :type 'toml-table-error)))
 
-(ert-deftest toml-test:make-hashes ()
+(ert-deftest toml-test:make-table-hashes ()
   (let (hash)
-    (setq hash (toml:make-hashes '("servers" "alpha") "ip" "192.0.2.1" hash))
+    (setq hash (toml:make-table-hashes '("servers" "alpha") "ip" "192.0.2.1" hash))
     (should (equal '("ip" . "192.0.2.1") (toml:assoc '("servers" "alpha" "ip") hash)))
 
-    (setq hash (toml:make-hashes '("servers" "alpha") "dc" "eqdc10" hash))
+    (setq hash (toml:make-table-hashes '("servers" "alpha") "dc" "eqdc10" hash))
     (should (equal '("ip" . "192.0.2.1") (toml:assoc '("servers" "alpha" "ip") hash)))
     (should (equal '("dc" . "eqdc10")    (toml:assoc '("servers" "alpha" "dc") hash)))
 
-    (setq hash (toml:make-hashes '("servers" "beta") "dc" "eqdc10" hash))
+    (setq hash (toml:make-table-hashes '("servers" "beta") "dc" "eqdc10" hash))
     (should (equal '("ip" . "192.0.2.1") (toml:assoc '("servers" "alpha" "ip") hash)))
     (should (equal '("dc" . "eqdc10")    (toml:assoc '("servers" "alpha" "dc") hash)))
     (should (equal '("dc" . "eqdc10")    (toml:assoc '("servers" "beta"  "dc") hash)))
 
-    (setq hash (toml:make-hashes '("client") "ip" "192.0.2.123" hash))
+    (setq hash (toml:make-table-hashes '("client") "ip" "192.0.2.123" hash))
     (should (equal '("ip" . "192.0.2.1") (toml:assoc '("servers" "alpha" "ip") hash)))
     (should (equal '("dc" . "eqdc10")    (toml:assoc '("servers" "alpha" "dc") hash)))
     (should (equal '("dc" . "eqdc10")    (toml:assoc '("servers" "beta"  "dc") hash)))
     (should (equal '("ip" . "192.0.2.123") (toml:assoc '("client" "ip") hash)))
 
     ;; update
-    (setq hash (toml:make-hashes '("servers" "alpha") "ip" "192.0.2.233" hash))
+    (setq hash (toml:make-table-hashes '("servers" "alpha") "ip" "192.0.2.233" hash))
     (should (equal '("ip" . "192.0.2.233") (toml:assoc '("servers" "alpha" "ip") hash)))))
 
 (ert-deftest toml-test:parse()
