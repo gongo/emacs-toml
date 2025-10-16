@@ -150,11 +150,20 @@ notes:
   (let (element)
     (catch 'break
       (dolist (k keys)
-        (unless (toml:alistp hash) (throw 'break nil))
-        (setq element (assoc k hash))
-        (if element
-            (setq hash (cdr element))
-          (throw 'break nil)))
+        (cond
+         ;; Handle numeric indices for arrays
+         ((numberp k)
+          (unless (listp hash) (throw 'break nil))
+          (if (and (>= k 0) (< k (length hash)))
+              (setq hash (nth k hash))
+            (throw 'break nil)))
+         ;; Handle string keys for alists
+         (t
+          (unless (toml:alistp hash) (throw 'break nil))
+          (setq element (assoc k hash))
+          (if element
+              (setq hash (cdr element))
+            (throw 'break nil)))))
       element)))
 
 (defun toml:alistp (alist)
@@ -367,19 +376,57 @@ Move point to the end of read string."
       (toml:seek-readable-point))
     keygroup))
 
+(defun toml:read-keygroup-with-array-info ()
+  "Read keygroup and return (KEYGROUP IS-ARRAY) list."
+  (toml:seek-readable-point)
+  (let (keygroup is-array)
+    (while (and (not (eobp))
+                (char-equal (toml:get-char-at-point) ?\[))
+      (cond
+       ;; Array of tables: [[name]]
+       ((looking-at "\\[\\[")
+        (if (toml:search-forward "\\[\\[\\([a-zA-Z][a-zA-Z0-9_\\.-]*\\)\\]\\]")
+            (let ((keygroup-string (match-string-no-properties 1)))
+              (when (string-match "\\(_\\|\\.\\)\\'" keygroup-string)
+                (signal 'toml-keygroup-error (list (point))))
+              (setq keygroup (split-string (match-string-no-properties 1) "\\."))
+              (setq is-array t))
+          (signal 'toml-keygroup-error (list (point)))))
+       ;; Regular table: [name]
+       (t
+        (if (toml:search-forward "\\[\\([a-zA-Z][a-zA-Z0-9_\\.-]*\\)\\]")
+            (let ((keygroup-string (match-string-no-properties 1)))
+              (when (string-match "\\(_\\|\\.\\)\\'" keygroup-string)
+                (signal 'toml-keygroup-error (list (point))))
+              (setq keygroup (split-string (match-string-no-properties 1) "\\."))
+              (setq is-array nil))
+          (signal 'toml-keygroup-error (list (point))))))
+      (toml:seek-readable-point))
+    (when keygroup
+      (list keygroup is-array))))
+
 (defun toml:read-key ()
   (toml:seek-readable-point)
   (if (eobp) nil
-    (if (toml:search-forward "\\([a-zA-Z][a-zA-Z0-9_-]*\\) *= *")
+    (if (toml:search-forward "\\([a-zA-Z][a-zA-Z0-9_-]*\\(?:\\.[a-zA-Z][a-zA-Z0-9_-]*\\)*\\) *= *")
         (let ((key (match-string-no-properties 1)))
-          (when (string-match "_\\'" key)
+          (when (or (string-match "_\\'" key)
+                    (string-match "\\.$" key)
+                    (string-match "\\.\\." key))
             (signal 'toml-key-error (list (point))))
           key)
       (signal 'toml-key-error (list (point))))))
 
 (defun toml:make-hashes (keygroup key value hashes)
-  (let ((keys (append keygroup (list key))))
-    (toml:make-hashes-of-alist hashes keys value)))
+  (if (null key)
+      ;; For array initialization, just create the structure
+      (toml:make-hashes-of-alist hashes keygroup '())
+    ;; Normal key-value pair
+    (let ((key-parts (if (string-match "\\." key)
+                         (split-string key "\\.")
+                       (list key)))
+          (keys (append keygroup (list key))))
+      (toml:make-hashes-of-alist hashes (append keygroup key-parts) value))))
 
 (defun toml:make-hashes-of-alist (hashes keys value)
   (let* ((key (car keys))
@@ -394,38 +441,92 @@ Move point to the end of read string."
       (progn
         (add-to-list 'hashes (cons key value))))))
 
+(defun toml:update-array (keygroup array-value hashes)
+  "Update array at KEYGROUP with a new empty table, return updated hashes."
+  (let ((new-element nil))
+    (toml:make-hashes-of-alist hashes keygroup (append array-value (list new-element)))))
+
 (defun toml:read ()
   "Parse and return the TOML object following point."
   (let (current-keygroup
         current-key
         current-value
-        hashes keygroup-history)
+        hashes keygroup-history
+        current-is-array
+        just-saw-array-declaration)
     (while (not (eobp))
       (toml:seek-readable-point)
 
       ;; Check re-define keygroup
-      (let ((keygroup (toml:read-keygroup)))
-        (when keygroup
-          (if (and (not (eq keygroup current-keygroup))
+      (let ((keygroup-info (toml:read-keygroup-with-array-info)))
+        (when keygroup-info
+          (let ((keygroup (car keygroup-info))
+                (is-array (cadr keygroup-info)))
+            ;; Check for invalid redefinitions
+            (cond
+             ;; [a] followed by [a] = error
+             ((and (equal keygroup current-keygroup)
+                   (not is-array)
+                   (not current-is-array)
                    (member keygroup keygroup-history))
-              (signal 'toml-redefine-keygroup-error (list (point)))
-            (setq current-keygroup keygroup))))
+              (signal 'toml-redefine-keygroup-error (list (point))))
+             ;; [a] followed by [[a]] = error  
+             ((and (equal keygroup current-keygroup)
+                   is-array
+                   (not current-is-array)
+                   (member keygroup keygroup-history))
+              (signal 'toml-redefine-keygroup-error (list (point))))
+             ;; [[a]] followed by [a.b] where a.b starts with a = OK (add to last array element)
+             ((and current-is-array
+                   (not is-array)
+                   (>= (length keygroup) 1)
+                   (equal (car keygroup) (car current-keygroup)))
+              ;; This is a subtable of the current array, add to last element
+              (let ((array-value (cdr (toml:assoc current-keygroup hashes))))
+                (when array-value
+                  (let ((last-element (car (last array-value))))
+                    ;; Set current-keygroup to be the path within the last array element
+                    (setq current-keygroup (append (list (car current-keygroup) (1- (length array-value))) (cdr keygroup)))
+                    (setq current-is-array nil)))))
+             ;; Otherwise, allow it
+             (t
+              (setq current-keygroup keygroup)
+              (setq current-is-array is-array)
+              (setq just-saw-array-declaration is-array))))))
       (add-to-list 'keygroup-history current-keygroup)
 
-      (let ((elm (toml:assoc current-keygroup hashes)))
-        (when (and elm (not (toml:alistp (cdr elm))))
-          (signal 'toml-redefine-key-error (list (point)))))
+      ;; Handle array of tables - create new array element if needed
+      (when (and current-keygroup current-is-array just-saw-array-declaration)
+        (let ((existing-array (toml:assoc current-keygroup hashes)))
+          (if existing-array
+              ;; Append to existing array
+              (let ((array-value (cdr existing-array)))
+                (setq hashes (toml:update-array current-keygroup array-value hashes)))
+            ;; Create new array
+            (setq hashes (toml:make-hashes current-keygroup nil nil hashes))
+            (let ((array-value (cdr (toml:assoc current-keygroup hashes))))
+              (setq hashes (toml:update-array current-keygroup array-value hashes)))))
+        (setq just-saw-array-declaration nil))
 
       ;; Check re-define key (with keygroup)
       (setq current-key (toml:read-key))
-      (when (toml:assoc (append current-keygroup (list current-key)) hashes)
-        (signal 'toml-redefine-key-error (list (point))))
+      (when current-key
+        (when (toml:assoc (append current-keygroup (list current-key)) hashes)
+          (signal 'toml-redefine-key-error (list (point))))
 
-      (setq current-value (toml:read-value))
-      (setq hashes (toml:make-hashes current-keygroup
-                                       current-key
-                                       current-value
-                                       hashes))
+        (setq current-value (toml:read-value))
+        (if (and current-keygroup current-is-array)
+            ;; Add to the last element of the array
+            (let ((array-value (cdr (toml:assoc current-keygroup hashes))))
+              (let ((last-element (car (last array-value))))
+                (setf (cdr (toml:assoc current-keygroup hashes))
+                      (append (butlast array-value)
+                              (list (toml:make-hashes nil current-key current-value last-element))))))
+          ;; Normal table or no table
+          (setq hashes (toml:make-hashes current-keygroup
+                                         current-key
+                                         current-value
+                                         hashes))))
 
       (toml:seek-readable-point))
     hashes))

@@ -187,7 +187,23 @@ aiueo"
   (toml-test:buffer-setup
    "server12 = name"
    (should (equal "server12" (toml:read-key)))
-   (should (eq ?n (toml:get-char-at-point)))))
+   (should (eq ?n (toml:get-char-at-point))))
+
+  ;; Test dotted keys
+  (toml-test:buffer-setup
+   "zeroize.workspace = true"
+   (should (equal "zeroize.workspace" (toml:read-key)))
+   (should (eq ?t (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "dependencies.serde.version = \"1.0\""
+   (should (equal "dependencies.serde.version" (toml:read-key)))
+   (should (eq ?\" (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "foo.bar_baz = 42"
+   (should (equal "foo.bar_baz" (toml:read-key)))
+   (should (eq ?4 (toml:get-char-at-point)))))
 
 (ert-deftest toml-test-error:read-key ()
   ;; no key
@@ -208,6 +224,21 @@ aiueo"
   ;; end with underscore
   (toml-test:buffer-setup
    "connection_ = 5000"
+   (should-error (toml:read-key) :type 'toml-key-error))
+
+  ;; end with dot
+  (toml-test:buffer-setup
+   "foo. = 5000"
+   (should-error (toml:read-key) :type 'toml-key-error))
+
+  ;; consecutive dots
+  (toml-test:buffer-setup
+   "foo..bar = 5000"
+   (should-error (toml:read-key) :type 'toml-key-error))
+
+  ;; start with dot
+  (toml-test:buffer-setup
+   ".foo = 5000"
    (should-error (toml:read-key) :type 'toml-key-error)))
 
 
@@ -222,17 +253,32 @@ aiueo"
 
   (toml-test:buffer-setup
    "[servers]
-    [servers.alpha]
+     [servers.alpha]
 
-       key = value"
+        key = value"
    (should (equal '("servers" "alpha") (toml:read-keygroup)))
    (should (eq ?k (toml:get-char-at-point))))
 
-  (toml-test:buffer-setup
+   (toml-test:buffer-setup
    "[servers]
-    [servers.alpha]
-    [client]"
+     [servers.alpha]
+     [client]"
    (should (equal '("client") (toml:read-keygroup)))))
+
+(ert-deftest toml-test:read-keygroup-with-array-info ()
+  ;; Test array of tables detection
+  (toml-test:buffer-setup
+   "[[products]]"
+   (should (equal '(("products") t) (toml:read-keygroup-with-array-info))))
+
+  (toml-test:buffer-setup
+   "[[fruits.apple]]"
+   (should (equal '(("fruits" "apple") t) (toml:read-keygroup-with-array-info))))
+
+  ;; Test regular tables still work
+  (toml-test:buffer-setup
+   "[aiueo]"
+   (should (equal '(("aiueo") nil) (toml:read-keygroup-with-array-info)))))
 
 (ert-deftest toml-test-error:read-keygroup ()
   (toml-test:buffer-setup
@@ -380,3 +426,111 @@ c = 2"
        (if expected-error
            (should-error (toml:read) :type expected-error)
          (should (toml:read)))))))
+
+(ert-deftest toml-test:dotted-keys ()
+  (toml-test:buffer-setup
+   "\
+[dependencies]
+zeroize.workspace = true
+serde.version = \"1.0\"
+serde.features = [\"derive\"]
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("workspace" . t) (toml:assoc '("dependencies" "zeroize" "workspace") parsed)))
+     (should (equal '("version" . "1.0") (toml:assoc '("dependencies" "serde" "version") parsed)))
+     (should (equal '("features" . ("derive")) (toml:assoc '("dependencies" "serde" "features") parsed)))))
+
+  (toml-test:buffer-setup
+   "\
+fruit.apple.color = \"red\"
+fruit.apple.taste.sweet = true
+fruit.banana.color = \"yellow\"
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("color" . "red") (toml:assoc '("fruit" "apple" "color") parsed)))
+     (should (equal '("sweet" . t) (toml:assoc '("fruit" "apple" "taste" "sweet") parsed)))
+     (should (equal '("color" . "yellow") (toml:assoc '("fruit" "banana" "color") parsed)))))
+
+  ;; Test mixed dotted keys and regular keys
+  (toml-test:buffer-setup
+   "\
+[package]
+name = \"test\"
+version.workspace = true
+authors = [\"Alice <alice@example.com>\"]
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("name" . "test") (toml:assoc '("package" "name") parsed)))
+     (should (equal '("workspace" . t) (toml:assoc '("package" "version" "workspace") parsed)))
+     (should (equal '("authors" . ("Alice <alice@example.com>")) (toml:assoc '("package" "authors") parsed))))))
+
+(ert-deftest toml-test:array-of-tables ()
+  ;; Basic array of tables
+  (toml-test:buffer-setup
+   "\
+[[products]]
+name = \"Hammer\"
+sku = 738594937
+
+[[products]]  
+name = \"Nail\"
+sku = 284758393
+color = \"gray\"
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("name" . "Hammer") (toml:assoc '("products" 0 "name") parsed)))
+     (should (equal '("sku" . 738594937) (toml:assoc '("products" 0 "sku") parsed)))
+     (should (equal '("name" . "Nail") (toml:assoc '("products" 1 "name") parsed)))
+     (should (equal '("sku" . 284758393) (toml:assoc '("products" 1 "sku") parsed)))
+     (should (equal '("color" . "gray") (toml:assoc '("products" 1 "color") parsed)))))
+
+  ;; Array of tables with nested structure
+  (toml-test:buffer-setup
+   "\
+[[fruits]]
+name = \"apple\"
+
+[fruits.physical]
+color = \"red\"
+shape = \"round\"
+
+[[fruits.varieties]]
+name = \"red delicious\"
+
+[[fruits.varieties]]
+name = \"granny smith\"
+
+[[fruits]]
+name = \"banana\"
+
+[[fruits.varieties]]
+name = \"plantain\"
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("name" . "apple") (toml:assoc '("fruits" 0 "name") parsed)))
+     (should (equal '("color" . "red") (toml:assoc '("fruits" 0 "physical" "color") parsed)))
+     (should (equal '("name" . "red delicious") (toml:assoc '("fruits" 0 "varieties" 0 "name") parsed)))
+     (should (equal '("name" . "granny smith") (toml:assoc '("fruits" 0 "varieties" 1 "name") parsed)))
+     (should (equal '("name" . "banana") (toml:assoc '("fruits" 1 "name") parsed)))
+     (should (equal '("name" . "plantain") (toml:assoc '("fruits" 1 "varieties" 0 "name") parsed)))))
+
+  ;; Mixed regular tables and array of tables
+  (toml-test:buffer-setup
+   "\
+[database]
+server = \"192.168.1.1\"
+
+[[servers]]
+ip = \"10.0.0.1\"
+dc = \"eqdc10\"
+
+[[servers]]
+ip = \"10.0.0.2\"
+dc = \"eqdc10\"
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("server" . "192.168.1.1") (toml:assoc '("database" "server") parsed)))
+     (should (equal '("ip" . "10.0.0.1") (toml:assoc '("servers" 0 "ip") parsed)))
+     (should (equal '("dc" . "eqdc10") (toml:assoc '("servers" 0 "dc") parsed)))
+     (should (equal '("ip" . "10.0.0.2") (toml:assoc '("servers" 1 "ip") parsed)))
+     (should (equal '("dc" . "eqdc10") (toml:assoc '("servers" 1 "dc") parsed))))))
