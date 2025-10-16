@@ -253,17 +253,32 @@ aiueo"
 
   (toml-test:buffer-setup
    "[servers]
-    [servers.alpha]
+     [servers.alpha]
 
-       key = value"
+        key = value"
    (should (equal '("servers" "alpha") (toml:read-keygroup)))
    (should (eq ?k (toml:get-char-at-point))))
 
-  (toml-test:buffer-setup
+   (toml-test:buffer-setup
    "[servers]
-    [servers.alpha]
-    [client]"
+     [servers.alpha]
+     [client]"
    (should (equal '("client") (toml:read-keygroup)))))
+
+(ert-deftest toml-test:read-keygroup-with-array-info ()
+  ;; Test array of tables detection
+  (toml-test:buffer-setup
+   "[[products]]"
+   (should (equal '(("products") t) (toml:read-keygroup-with-array-info))))
+
+  (toml-test:buffer-setup
+   "[[fruits.apple]]"
+   (should (equal '(("fruits" "apple") t) (toml:read-keygroup-with-array-info))))
+
+  ;; Test regular tables still work
+  (toml-test:buffer-setup
+   "[aiueo]"
+   (should (equal '(("aiueo") nil) (toml:read-keygroup-with-array-info)))))
 
 (ert-deftest toml-test-error:read-keygroup ()
   (toml-test:buffer-setup
@@ -448,3 +463,74 @@ authors = [\"Alice <alice@example.com>\"]
      (should (equal '("name" . "test") (toml:assoc '("package" "name") parsed)))
      (should (equal '("workspace" . t) (toml:assoc '("package" "version" "workspace") parsed)))
      (should (equal '("authors" . ("Alice <alice@example.com>")) (toml:assoc '("package" "authors") parsed))))))
+
+(ert-deftest toml-test:array-of-tables ()
+  ;; Basic array of tables
+  (toml-test:buffer-setup
+   "\
+[[products]]
+name = \"Hammer\"
+sku = 738594937
+
+[[products]]  
+name = \"Nail\"
+sku = 284758393
+color = \"gray\"
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("name" . "Hammer") (toml:assoc '("products" 0 "name") parsed)))
+     (should (equal '("sku" . 738594937) (toml:assoc '("products" 0 "sku") parsed)))
+     (should (equal '("name" . "Nail") (toml:assoc '("products" 1 "name") parsed)))
+     (should (equal '("sku" . 284758393) (toml:assoc '("products" 1 "sku") parsed)))
+     (should (equal '("color" . "gray") (toml:assoc '("products" 1 "color") parsed)))))
+
+  ;; Array of tables with nested structure
+  (toml-test:buffer-setup
+   "\
+[[fruits]]
+name = \"apple\"
+
+[fruits.physical]
+color = \"red\"
+shape = \"round\"
+
+[[fruits.varieties]]
+name = \"red delicious\"
+
+[[fruits.varieties]]
+name = \"granny smith\"
+
+[[fruits]]
+name = \"banana\"
+
+[[fruits.varieties]]
+name = \"plantain\"
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("name" . "apple") (toml:assoc '("fruits" 0 "name") parsed)))
+     (should (equal '("color" . "red") (toml:assoc '("fruits" 0 "physical" "color") parsed)))
+     (should (equal '("name" . "red delicious") (toml:assoc '("fruits" 0 "varieties" 0 "name") parsed)))
+     (should (equal '("name" . "granny smith") (toml:assoc '("fruits" 0 "varieties" 1 "name") parsed)))
+     (should (equal '("name" . "banana") (toml:assoc '("fruits" 1 "name") parsed)))
+     (should (equal '("name" . "plantain") (toml:assoc '("fruits" 1 "varieties" 0 "name") parsed)))))
+
+  ;; Mixed regular tables and array of tables
+  (toml-test:buffer-setup
+   "\
+[database]
+server = \"192.168.1.1\"
+
+[[servers]]
+ip = \"10.0.0.1\"
+dc = \"eqdc10\"
+
+[[servers]]
+ip = \"10.0.0.2\"
+dc = \"eqdc10\"
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("server" . "192.168.1.1") (toml:assoc '("database" "server") parsed)))
+     (should (equal '("ip" . "10.0.0.1") (toml:assoc '("servers" 0 "ip") parsed)))
+     (should (equal '("dc" . "eqdc10") (toml:assoc '("servers" 0 "dc") parsed)))
+     (should (equal '("ip" . "10.0.0.2") (toml:assoc '("servers" 1 "ip") parsed)))
+     (should (equal '("dc" . "eqdc10") (toml:assoc '("servers" 1 "dc") parsed))))))
