@@ -187,7 +187,23 @@ aiueo"
   (toml-test:buffer-setup
    "server12 = name"
    (should (equal "server12" (toml:read-key)))
-   (should (eq ?n (toml:get-char-at-point)))))
+   (should (eq ?n (toml:get-char-at-point))))
+
+  ;; Test dotted keys
+  (toml-test:buffer-setup
+   "zeroize.workspace = true"
+   (should (equal "zeroize.workspace" (toml:read-key)))
+   (should (eq ?t (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "dependencies.serde.version = \"1.0\""
+   (should (equal "dependencies.serde.version" (toml:read-key)))
+   (should (eq ?\" (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "foo.bar_baz = 42"
+   (should (equal "foo.bar_baz" (toml:read-key)))
+   (should (eq ?4 (toml:get-char-at-point)))))
 
 (ert-deftest toml-test-error:read-key ()
   ;; no key
@@ -208,6 +224,21 @@ aiueo"
   ;; end with underscore
   (toml-test:buffer-setup
    "connection_ = 5000"
+   (should-error (toml:read-key) :type 'toml-key-error))
+
+  ;; end with dot
+  (toml-test:buffer-setup
+   "foo. = 5000"
+   (should-error (toml:read-key) :type 'toml-key-error))
+
+  ;; consecutive dots
+  (toml-test:buffer-setup
+   "foo..bar = 5000"
+   (should-error (toml:read-key) :type 'toml-key-error))
+
+  ;; start with dot
+  (toml-test:buffer-setup
+   ".foo = 5000"
    (should-error (toml:read-key) :type 'toml-key-error)))
 
 
@@ -380,3 +411,40 @@ c = 2"
        (if expected-error
            (should-error (toml:read) :type expected-error)
          (should (toml:read)))))))
+
+(ert-deftest toml-test:dotted-keys ()
+  (toml-test:buffer-setup
+   "\
+[dependencies]
+zeroize.workspace = true
+serde.version = \"1.0\"
+serde.features = [\"derive\"]
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("workspace" . t) (toml:assoc '("dependencies" "zeroize" "workspace") parsed)))
+     (should (equal '("version" . "1.0") (toml:assoc '("dependencies" "serde" "version") parsed)))
+     (should (equal '("features" . ("derive")) (toml:assoc '("dependencies" "serde" "features") parsed)))))
+
+  (toml-test:buffer-setup
+   "\
+fruit.apple.color = \"red\"
+fruit.apple.taste.sweet = true
+fruit.banana.color = \"yellow\"
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("color" . "red") (toml:assoc '("fruit" "apple" "color") parsed)))
+     (should (equal '("sweet" . t) (toml:assoc '("fruit" "apple" "taste" "sweet") parsed)))
+     (should (equal '("color" . "yellow") (toml:assoc '("fruit" "banana" "color") parsed)))))
+
+  ;; Test mixed dotted keys and regular keys
+  (toml-test:buffer-setup
+   "\
+[package]
+name = \"test\"
+version.workspace = true
+authors = [\"Alice <alice@example.com>\"]
+"
+   (let ((parsed (toml:read)))
+     (should (equal '("name" . "test") (toml:assoc '("package" "name") parsed)))
+     (should (equal '("workspace" . t) (toml:assoc '("package" "version" "workspace") parsed)))
+     (should (equal '("authors" . ("Alice <alice@example.com>")) (toml:assoc '("package" "authors") parsed))))))
