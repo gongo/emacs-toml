@@ -1,4 +1,4 @@
-;;; toml.el --- TOML (Tom's Obvious, Minimal Language) parser
+;;; toml.el --- TOML (Tom's Obvious, Minimal Language) parser -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2013 by Wataru MIYAGUNI
 
@@ -148,9 +148,10 @@ notes:
      '(toml-array-table-error toml-error error))
 
 (defun toml:assoc (keys hash)
-  "Example:
+  "Look up nested KEYS in HASH and return the found element.
 
-  (toml:assoc '(\"servers\" \"alpha\" \"ip\") hash)"
+Example:
+  (toml:assoc \\='(\"servers\" \"alpha\" \"ip\") hash)"
   (let (element)
     (catch 'break
       (dolist (k keys)
@@ -196,7 +197,7 @@ Skip target:
       (toml:seek-non-whitespace))))
 
 (defun toml:seek-non-whitespace ()
-  "Move point forward, stopping before a char end-of-buffer or not in whitespace (tab and space)."
+  "Move point forward, stopping before non-whitespace char or EOB."
   (if (re-search-forward "[^ \t\n]" nil t)
       (backward-char)
     (re-search-forward "[ \t\n]+\\'" nil t)))
@@ -256,9 +257,8 @@ Move point to the end of read strings."
   (unless (eq ?\' (toml:get-char-at-point))
     (signal 'toml-string-error (list (point))))
   (forward-char)
-  (let ((characters '())
-        char)
-    (while (not (eq (setq char (toml:get-char-at-point)) ?\'))
+  (let ((characters '()))
+    (while (not (eq (toml:get-char-at-point) ?\'))
       (when (toml:end-of-line-p)
         (signal 'toml-string-error (list (point))))
       (push (toml:read-char) characters))
@@ -360,16 +360,17 @@ Move point to the end of read string."
 (defun toml:read-table (&optional table-history-checker)
   "Parse TOML table header and return table type and keys.
 Returns a plist with :type (single or array) and :keys (list of key names).
-Handles both regular tables [table.name] and array of tables [[table.name]].
+Handles both regular tables [table.name] and array of tables
+\[[table.name]].
 
-TABLE-HISTORY-CHECKER is an optional function that takes keys and signals
-an error if the table has been defined before.
+TABLE-HISTORY-CHECKER is an optional function that takes keys and
+signals an error if the table has been defined before.
 
 Behavior differences:
 - :type single (for table [xxx])
   - If no key/value pairs are defined, continue to next table
 - :type array (for array of table [[xxx]])
-  - Stop reading regardless of key/value presence (for empty table representation)"
+  - Stop reading regardless of key/value presence"
   (toml:seek-readable-point)
   (let (table-keys table-type)
     (while (and (not (eobp))
@@ -406,14 +407,17 @@ Behavior differences:
    (t (signal 'toml-key-error (list (point))))))
 
 (defun toml:make-table-hashes (table-keys key value hashes)
-  "Add a VALUE to HASHES at the path specified by TABLE-KEYS and KEY, creating nested tables as needed.
+  "Add VALUE to HASHES at TABLE-KEYS + KEY path, creating nested tables.
 
 Usage:
   (setq hash nil)
-  (setq hash (toml:make-table-hashes '(\"servers\" \"alpha\") \"ip\" \"192.0.2.1\" hash))
+  (setq hash (toml:make-table-hashes
+              \\='(\"servers\" \"alpha\") \"ip\" \"192.0.2.1\" hash))
   ;; => ((\"servers\" (\"alpha\" (\"ip\" . \"192.0.2.1\"))))
-  (setq hash (toml:make-table-hashes '(\"servers\" \"alpha\") \"dc\" \"eqdc10\" hash))
-  ;; => ((\"servers\" (\"alpha\" (\"dc\" . \"eqdc10\") (\"ip\" . \"192.0.2.1\"))))"
+  (setq hash (toml:make-table-hashes
+              \\='(\"servers\" \"alpha\") \"dc\" \"eqdc10\" hash))
+  ;; => ((\"servers\" (\"alpha\" (\"dc\" . \"eqdc10\")
+  ;;                          (\"ip\" . \"192.0.2.1\"))))"
   (letrec ((build-nested (lambda (hash-data keys-list val)
                            (if (null keys-list)
                                val
@@ -424,8 +428,8 @@ Usage:
                                (setq hash-data (delete element hash-data))
                                (if descendants
                                    (let ((new-children (funcall build-nested children descendants val)))
-                                     (add-to-list 'hash-data (cons current-key new-children)))
-                                 (add-to-list 'hash-data (cons current-key val)))
+                                     (push (cons current-key new-children) hash-data))
+                                 (push (cons current-key val) hash-data))
                                hash-data)))))
     (let ((keys (append table-keys (list key))))
       (funcall build-nested hashes keys value))))
@@ -437,11 +441,11 @@ Only returns a PROPER parent, not the keys themselves.
 
 Example:
   ;; If (\"fruits\") is registered as array table
-  (toml:find-parent-array-table '(\"fruits\" \"physical\") registry)
+  (toml:find-parent-array-table \\='(\"fruits\" \"physical\") registry)
   ;; => (\"fruits\")
 
-  (toml:find-parent-array-table '(\"fruits\") registry)
-  ;; => nil  ; not a proper parent, it's the same"
+  (toml:find-parent-array-table \\='(\"fruits\") registry)
+  ;; => nil  ; not a proper parent, it is the same"
   (let ((result nil)
         (prefix nil)
         (keys-len (length keys)))
@@ -457,17 +461,18 @@ Example:
     result))
 
 (defun toml:make-array-table-hashes (array-keys hashes &optional parent-array-context)
-  "Create or extend an array of tables entry at ARRAY-KEYS path in HASHES.
+  "Create or extend an array of tables entry at ARRAY-KEYS in HASHES.
 Returns updated hashes with a new empty element added to the array.
 
 PARENT-ARRAY-CONTEXT is a plist (:keys array-keys :index n) indicating
 the parent array table context for nested array tables.
 
 Example:
-  (toml:make-array-table-hashes '(\"products\") nil)
+  (toml:make-array-table-hashes \\='(\"products\") nil)
   ;; => ((\"products\" . [nil]))
 
-  (toml:make-array-table-hashes '(\"products\") '((\"products\" . [nil])))
+  (toml:make-array-table-hashes \\='(\"products\")
+                                \\='((\"products\" . [nil])))
   ;; => ((\"products\" . [nil nil]))"
   (if (null array-keys)
       hashes
@@ -537,14 +542,17 @@ Returns updated hashes.
 
 Example:
   ;; For [[products]] with name = \"Hammer\"
-  (toml:add-to-array-table '(\"products\") nil \"name\" \"Hammer\" hashes registry)
+  (toml:add-to-array-table \\='(\"products\") nil
+                           \"name\" \"Hammer\" hashes registry)
 
   ;; For [[fruits]] with [fruits.physical] color = \"red\"
-  (toml:add-to-array-table '(\"fruits\") '(\"physical\") \"color\" \"red\" hashes registry)
+  (toml:add-to-array-table \\='(\"fruits\") \\='(\"physical\")
+                           \"color\" \"red\" hashes registry)
 
   ;; For [[fruits.varieties]] with name = \"red delicious\"
   ;; array-keys = (\"fruits\" \"varieties\"), parent is (\"fruits\")
-  (toml:add-to-array-table '(\"fruits\" \"varieties\") nil \"name\" \"red delicious\" hashes registry)"
+  (toml:add-to-array-table \\='(\"fruits\" \"varieties\") nil
+                           \"name\" \"red delicious\" hashes registry)"
   (let ((parent-array (toml:find-parent-array-table array-keys array-registry)))
     (if parent-array
         ;; Nested array table: navigate through parent first
