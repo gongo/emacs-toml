@@ -210,67 +210,121 @@ aiueo"
    "connection_ = 5000"
    (should-error (toml:read-key) :type 'toml-key-error)))
 
+(ert-deftest toml-test:read-array ()
+  (toml-test:buffer-setup
+   "[]"
+   (should (equal [] (toml:read-array))))
 
-(ert-deftest toml-test:read-keygroup ()
+  (toml-test:buffer-setup
+   "[1, 2, 3]"
+   (should (equal [1 2 3] (toml:read-array))))
+
+  (toml-test:buffer-setup
+   "[ [1, 2], [3, 4, 5] ]"
+   (should (equal [[1 2] [3 4 5]] (toml:read-array))))
+
+  (toml-test:buffer-setup
+   "[
+      1,
+      2,
+    ]"
+   (should (equal [1 2] (toml:read-array))))
+  )
+
+(ert-deftest toml-test-error:read-array ()
+  (toml-test:buffer-setup
+   "[1 2 3]"
+   (should-error (toml:read-array) :type 'toml-array-error))
+
+  ;; FIXME: Data types may not be mixed
+  ;; (toml-test:buffer-setup
+  ;;  "[1, 0.2]"
+  ;;  (should-error (toml:read-array) :type 'toml-array-error))
+  )
+
+(ert-deftest toml-test:read-table ()
   (toml-test:buffer-setup
    "[aiueo]"
-   (should (equal '("aiueo") (toml:read-keygroup))))
+   (should (equal '(:type single :keys ("aiueo")) (toml:read-table))))
 
   (toml-test:buffer-setup
    "[ai-ueo]"
-   (should (equal '("ai-ueo") (toml:read-keygroup))))
+   (should (equal '(:type single :keys ("ai-ueo")) (toml:read-table))))
 
   (toml-test:buffer-setup
    "[servers]
     [servers.alpha]
 
        key = value"
-   (should (equal '("servers" "alpha") (toml:read-keygroup)))
+   (should (equal '(:type single :keys ("servers" "alpha")) (toml:read-table)))
    (should (eq ?k (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "[servers]
     [servers.alpha]
     [client]"
-   (should (equal '("client") (toml:read-keygroup)))))
+   (should (equal '(:type single :keys ("client")) (toml:read-table))))
 
-(ert-deftest toml-test-error:read-keygroup ()
+  (toml-test:buffer-setup
+   "[[aiueo]]"
+   (should (equal '(:type array :keys ("aiueo")) (toml:read-table))))
+
+  (toml-test:buffer-setup
+   "[[ai-ueo]]"
+   (should (equal '(:type array :keys ("ai-ueo")) (toml:read-table))))
+
+  (toml-test:buffer-setup
+   "[[servers]]
+    [[servers.alpha]]
+
+       key = value"
+   (should (equal '(:type array :keys ("servers")) (toml:read-table)))
+   (should (eq ?\[ (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "[[servers]]
+    [[servers.alpha]]
+    [[client]]"
+   (should (equal '(:type array :keys ("servers")) (toml:read-table))))
+  )
+
+(ert-deftest toml-test-error:read-table ()
   (toml-test:buffer-setup
    "[]"
-   (should-error (toml:read-keygroup) :type 'toml-keygroup-error))
+   (should-error (toml:read-table) :type 'toml-table-error))
 
   ;; end with underscore "_"
   (toml-test:buffer-setup
    "[foo.bar_]"
-   (should-error (toml:read-keygroup) :type 'toml-keygroup-error))
+   (should-error (toml:read-table) :type 'toml-table-error))
 
   ;; end with period "."
   (toml-test:buffer-setup
    "[foo.bar.]"
-   (should-error (toml:read-keygroup) :type 'toml-keygroup-error)))
+   (should-error (toml:read-table) :type 'toml-table-error)))
 
-(ert-deftest toml-test:make-hashes ()
+(ert-deftest toml-test:make-table-hashes ()
   (let (hash)
-    (setq hash (toml:make-hashes '("servers" "alpha") "ip" "192.0.2.1" hash))
+    (setq hash (toml:make-table-hashes '("servers" "alpha") "ip" "192.0.2.1" hash))
     (should (equal '("ip" . "192.0.2.1") (toml:assoc '("servers" "alpha" "ip") hash)))
 
-    (setq hash (toml:make-hashes '("servers" "alpha") "dc" "eqdc10" hash))
+    (setq hash (toml:make-table-hashes '("servers" "alpha") "dc" "eqdc10" hash))
     (should (equal '("ip" . "192.0.2.1") (toml:assoc '("servers" "alpha" "ip") hash)))
     (should (equal '("dc" . "eqdc10")    (toml:assoc '("servers" "alpha" "dc") hash)))
 
-    (setq hash (toml:make-hashes '("servers" "beta") "dc" "eqdc10" hash))
+    (setq hash (toml:make-table-hashes '("servers" "beta") "dc" "eqdc10" hash))
     (should (equal '("ip" . "192.0.2.1") (toml:assoc '("servers" "alpha" "ip") hash)))
     (should (equal '("dc" . "eqdc10")    (toml:assoc '("servers" "alpha" "dc") hash)))
     (should (equal '("dc" . "eqdc10")    (toml:assoc '("servers" "beta"  "dc") hash)))
 
-    (setq hash (toml:make-hashes '("client") "ip" "192.0.2.123" hash))
+    (setq hash (toml:make-table-hashes '("client") "ip" "192.0.2.123" hash))
     (should (equal '("ip" . "192.0.2.1") (toml:assoc '("servers" "alpha" "ip") hash)))
     (should (equal '("dc" . "eqdc10")    (toml:assoc '("servers" "alpha" "dc") hash)))
     (should (equal '("dc" . "eqdc10")    (toml:assoc '("servers" "beta"  "dc") hash)))
     (should (equal '("ip" . "192.0.2.123") (toml:assoc '("client" "ip") hash)))
 
     ;; update
-    (setq hash (toml:make-hashes '("servers" "alpha") "ip" "192.0.2.233" hash))
+    (setq hash (toml:make-table-hashes '("servers" "alpha") "ip" "192.0.2.233" hash))
     (should (equal '("ip" . "192.0.2.233") (toml:assoc '("servers" "alpha" "ip") hash)))))
 
 (ert-deftest toml-test:parse()
@@ -288,7 +342,7 @@ f = { foo = 2342 }
    (let ((parsed (toml:read)))
      (should (equal '("c" . 1) (toml:assoc '("a" "b" "c") parsed)))
      (should (equal '("d" . 2) (toml:assoc '("a" "d") parsed)))
-     (should (equal '("e" . nil) (toml:assoc '("a" "e") parsed)))
+     (should (equal '("e" . []) (toml:assoc '("a" "e") parsed)))
      (should (equal '("f" . (("foo" . 2342))) (toml:assoc '("a" "f") parsed)))
      (should (equal '("g" ("bar" . 4711) ("baz" . "foo")) (toml:assoc '("a" "b" "g") parsed)))
      ))
@@ -345,7 +399,7 @@ b = 1
 
 \[a\]
 c = 2"
-   (should-error (toml:read) :type 'toml-redefine-keygroup-error))
+   (should-error (toml:read) :type 'toml-redefine-table-error))
 
   (toml-test:buffer-setup
    "\
@@ -380,3 +434,252 @@ c = 2"
        (if expected-error
            (should-error (toml:read) :type expected-error)
          (should (toml:read)))))))
+
+;; Array of Tables tests
+
+(ert-deftest toml-test:read-array-of-tables-basic ()
+  "Test basic array of tables parsing."
+  (toml-test:buffer-setup
+   "[[products]]
+name = \"Hammer\"
+sku = 738594937
+
+[[products]]
+name = \"Nail\"
+sku = 284758393"
+   (let ((parsed (toml:read)))
+     ;; products should be a vector
+     (should (vectorp (cdr (assoc "products" parsed))))
+     ;; Should have 2 elements
+     (should (= 2 (length (cdr (assoc "products" parsed)))))
+     ;; First element
+     (let ((first (aref (cdr (assoc "products" parsed)) 0)))
+       (should (equal "Hammer" (cdr (assoc "name" first))))
+       (should (equal 738594937 (cdr (assoc "sku" first)))))
+     ;; Second element
+     (let ((second (aref (cdr (assoc "products" parsed)) 1)))
+       (should (equal "Nail" (cdr (assoc "name" second))))
+       (should (equal 284758393 (cdr (assoc "sku" second))))))))
+
+(ert-deftest toml-test:read-empty-array-of-tables ()
+  "Test array of tables with empty elements."
+  (toml-test:buffer-setup
+   "[[products]]
+name = \"Hammer\"
+
+[[products]]
+
+[[products]]
+name = \"Nail\""
+   (let ((parsed (toml:read)))
+     (let ((products (cdr (assoc "products" parsed))))
+       ;; Should have 3 elements
+       (should (= 3 (length products)))
+       ;; First element has name
+       (should (equal "Hammer" (cdr (assoc "name" (aref products 0)))))
+       ;; Second element is empty (nil)
+       (should (null (aref products 1)))
+       ;; Third element has name
+       (should (equal "Nail" (cdr (assoc "name" (aref products 2)))))))))
+
+(ert-deftest toml-test:read-array-of-tables-with-subtable ()
+  "Test array of tables with sub-tables."
+  (toml-test:buffer-setup
+   "[[fruits]]
+name = \"apple\"
+
+[fruits.physical]
+color = \"red\"
+shape = \"round\"
+
+[[fruits]]
+name = \"banana\"
+
+[fruits.physical]
+color = \"yellow\"
+shape = \"long\""
+   (let ((parsed (toml:read)))
+     (let ((fruits (cdr (assoc "fruits" parsed))))
+       ;; Should have 2 elements
+       (should (= 2 (length fruits)))
+       ;; First element
+       (let ((first (aref fruits 0)))
+         (should (equal "apple" (cdr (assoc "name" first))))
+         (let ((physical (cdr (assoc "physical" first))))
+           (should (equal "red" (cdr (assoc "color" physical))))
+           (should (equal "round" (cdr (assoc "shape" physical))))))
+       ;; Second element
+       (let ((second (aref fruits 1)))
+         (should (equal "banana" (cdr (assoc "name" second))))
+         (let ((physical (cdr (assoc "physical" second))))
+           (should (equal "yellow" (cdr (assoc "color" physical))))
+           (should (equal "long" (cdr (assoc "shape" physical))))))))))
+
+(ert-deftest toml-test:read-nested-array-of-tables ()
+  "Test nested array of tables."
+  (toml-test:buffer-setup
+   "[[fruits]]
+name = \"apple\"
+
+[[fruits.varieties]]
+name = \"red delicious\"
+
+[[fruits.varieties]]
+name = \"granny smith\"
+
+[[fruits]]
+name = \"banana\"
+
+[[fruits.varieties]]
+name = \"plantain\""
+   (let ((parsed (toml:read)))
+     (let ((fruits (cdr (assoc "fruits" parsed))))
+       ;; Should have 2 fruit elements
+       (should (= 2 (length fruits)))
+       ;; First fruit (apple)
+       (let ((apple (aref fruits 0)))
+         (should (equal "apple" (cdr (assoc "name" apple))))
+         (let ((varieties (cdr (assoc "varieties" apple))))
+           (should (vectorp varieties))
+           (should (= 2 (length varieties)))
+           (should (equal "red delicious" (cdr (assoc "name" (aref varieties 0)))))
+           (should (equal "granny smith" (cdr (assoc "name" (aref varieties 1)))))))
+       ;; Second fruit (banana)
+       (let ((banana (aref fruits 1)))
+         (should (equal "banana" (cdr (assoc "name" banana))))
+         (let ((varieties (cdr (assoc "varieties" banana))))
+           (should (vectorp varieties))
+           (should (= 1 (length varieties)))
+           (should (equal "plantain" (cdr (assoc "name" (aref varieties 0)))))))))))
+
+;; Error tests for Array of Tables
+
+(ert-deftest toml-test-error:array-table-static-array ()
+  "Test that appending to a statically defined array is an error."
+  (toml-test:buffer-setup
+   "fruits = []
+
+[[fruits]]
+name = \"apple\""
+   (should-error (toml:read) :type 'toml-array-table-error)))
+
+(ert-deftest toml-test-error:array-table-conflicts-with-table ()
+  "Test that array table conflicts with existing table."
+  (toml-test:buffer-setup
+   "[fruits]
+name = \"apple\"
+
+[[fruits]]
+name = \"banana\""
+   (should-error (toml:read) :type 'toml-array-table-error)))
+
+(ert-deftest toml-test-error:table-conflicts-with-array-table ()
+  "Test that table conflicts with existing array table."
+  (toml-test:buffer-setup
+   "[[fruits]]
+name = \"apple\"
+
+[fruits]
+name = \"banana\""
+   (should-error (toml:read) :type 'toml-array-table-error)))
+
+(ert-deftest toml-test:read-deeply-nested-array-of-tables ()
+  "Test deeply nested array of tables with sub-tables."
+  (toml-test:buffer-setup
+   "[[products]]
+name = \"Hammer\"
+sku = 738594937
+
+[[products]]
+name = \"Nail\"
+sku = 284758393
+
+[products.colors]
+primary = \"silver\"
+
+[[products]]
+name = \"Screwdriver\""
+   (let ((parsed (toml:read)))
+     (let ((products (cdr (assoc "products" parsed))))
+       ;; Should have 3 elements
+       (should (= 3 (length products)))
+       ;; First element
+       (should (equal "Hammer" (cdr (assoc "name" (aref products 0)))))
+       ;; Second element with colors sub-table
+       (let ((second (aref products 1)))
+         (should (equal "Nail" (cdr (assoc "name" second))))
+         (let ((colors (cdr (assoc "colors" second))))
+           (should (equal "silver" (cdr (assoc "primary" colors))))))
+       ;; Third element
+       (should (equal "Screwdriver" (cdr (assoc "name" (aref products 2)))))))))
+
+(ert-deftest toml-test:read-multiple-nested-array-tables ()
+  "Test multiple nested array tables at different levels."
+  (toml-test:buffer-setup
+   "[[servers]]
+name = \"server1\"
+
+[[servers.interfaces]]
+ip = \"10.0.0.1\"
+
+[[servers.interfaces]]
+ip = \"10.0.0.2\"
+
+[[servers]]
+name = \"server2\"
+
+[[servers.interfaces]]
+ip = \"192.168.1.1\""
+   (let ((parsed (toml:read)))
+     (let ((servers (cdr (assoc "servers" parsed))))
+       ;; Should have 2 server elements
+       (should (= 2 (length servers)))
+       ;; First server
+       (let ((server1 (aref servers 0)))
+         (should (equal "server1" (cdr (assoc "name" server1))))
+         (let ((interfaces (cdr (assoc "interfaces" server1))))
+           (should (vectorp interfaces))
+           (should (= 2 (length interfaces)))
+           (should (equal "10.0.0.1" (cdr (assoc "ip" (aref interfaces 0)))))
+           (should (equal "10.0.0.2" (cdr (assoc "ip" (aref interfaces 1)))))))
+       ;; Second server
+       (let ((server2 (aref servers 1)))
+         (should (equal "server2" (cdr (assoc "name" server2))))
+         (let ((interfaces (cdr (assoc "interfaces" server2))))
+           (should (vectorp interfaces))
+           (should (= 1 (length interfaces)))
+           (should (equal "192.168.1.1" (cdr (assoc "ip" (aref interfaces 0)))))))))))
+
+(ert-deftest toml-test:read-array-table-with-nested-subtable ()
+  "Test array of tables with deeply nested sub-tables."
+  (toml-test:buffer-setup
+   "[[books]]
+title = \"TOML Guide\"
+
+[books.author]
+name = \"John\"
+
+[books.author.address]
+city = \"Tokyo\"
+
+[[books]]
+title = \"Emacs Manual\"
+
+[books.author]
+name = \"Jane\""
+   (let ((parsed (toml:read)))
+     (let ((books (cdr (assoc "books" parsed))))
+       ;; Should have 2 book elements
+       (should (= 2 (length books)))
+       ;; First book with nested sub-tables
+       (let ((book1 (aref books 0)))
+         (should (equal "TOML Guide" (cdr (assoc "title" book1))))
+         (let ((author (cdr (assoc "author" book1))))
+           (should (equal "John" (cdr (assoc "name" author))))
+           (let ((address (cdr (assoc "address" author))))
+             (should (equal "Tokyo" (cdr (assoc "city" address)))))))
+       ;; Second book
+       (let ((book2 (aref books 1)))
+         (should (equal "Emacs Manual" (cdr (assoc "title" book2))))
+         (let ((author (cdr (assoc "author" book2))))
+           (should (equal "Jane" (cdr (assoc "name" author))))))))))
