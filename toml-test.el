@@ -155,10 +155,31 @@ aiueo"
    (let ((numeric (toml:read-numeric)))
      (should (toml:end-of-line-p))
      (should (equal -0.01 numeric))
-     (should (floatp numeric)))))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "+42"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 42 numeric))
+     (should (integerp numeric))))
+
+  (toml-test:buffer-setup
+   "+3.14"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 3.14 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "+0"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 0 numeric))
+     (should (integerp numeric)))))
 
 (ert-deftest toml-test-error:read-numeric ()
-  (dolist (str '("" "+11" "- 1.1" " 1.1" ".1" "1.1.1" "1.1.1.1"))
+  (dolist (str '("" "- 1.1" " 1.1" ".1" "1.1.1" "1.1.1.1"))
     (toml-test:buffer-setup
      str
      (should-error (toml:read-numeric) :type 'toml-numeric-error))))
