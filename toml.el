@@ -67,7 +67,7 @@ notes:
            (?\' . toml:read-literal-string))))
     (mapc (lambda (char)
             (push (cons char 'toml:read-start-with-number) table))
-          '(?- ?0 ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9))
+          '(?+ ?- ?0 ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9))
     table))
 
 (defconst toml->regexp-datetime
@@ -81,7 +81,7 @@ notes:
   "Regular expression for a datetime (Zulu time format).")
 
 (defconst toml->regexp-numeric
-  "\\(-?[0-9]+[\\.0-9\\]*\\)"
+  "\\([+-]?[0-9]+[\\.0-9]*\\)"
   "Regular expression for a numeric.")
 
 ;; Error conditions
