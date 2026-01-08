@@ -81,8 +81,12 @@ notes:
   "Regular expression for a datetime (Zulu time format).")
 
 (defconst toml->regexp-numeric
-  "\\([+-]?[0-9]+[\\.0-9]*\\)"
-  "Regular expression for a numeric.")
+  "\\([+-]?[0-9]+[.0-9eE+-]*\\)"
+  "Regular expression for capturing numeric-like strings.")
+
+(defconst toml->regexp-numeric-strict
+  "^[+-]?[0-9]+\\(?:\\.[0-9]+\\)?\\(?:[eE][+-]?[0-9]+\\)?$"
+  "Strict regular expression for validating numeric format.")
 
 ;; Error conditions
 
@@ -293,13 +297,16 @@ Move point to the end of read datetime string."
 Move point to the end of read numeric string."
   (unless (toml:search-forward toml->regexp-numeric)
     (signal 'toml-numeric-error (list (point))))
-  (let ((numeric (match-string-no-properties 0)))
-    (if (with-temp-buffer
-          (insert numeric)
-          (goto-char (point-min))
-          (search-forward "." nil t 2)) ;; e.g. "0.21.1" is NG
-        (signal 'toml-numeric-error (list (point)))
-      (string-to-number numeric))))
+  (let ((numeric-str (match-string-no-properties 0)))
+    ;; Two-stage validation:
+    ;; 1. toml->regexp-numeric (loose) - greedily captures all numeric-like
+    ;;    characters to ensure invalid trailing chars (e.g., "1.1.1") are
+    ;;    included in the match rather than left unparsed.
+    ;; 2. toml->regexp-numeric-strict - validates the captured string has
+    ;;    correct format (e.g., rejects "1e", "1.", "1.1.1").
+    (unless (string-match-p toml->regexp-numeric-strict numeric-str)
+      (signal 'toml-numeric-error (list (point))))
+    (string-to-number numeric-str)))
 
 (defun toml:read-start-with-number ()
   "Read string that start with number at point.
