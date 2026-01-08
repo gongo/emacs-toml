@@ -176,10 +176,53 @@ aiueo"
    (let ((numeric (toml:read-numeric)))
      (should (toml:end-of-line-p))
      (should (equal 0 numeric))
-     (should (integerp numeric)))))
+     (should (integerp numeric))))
+
+  (toml-test:buffer-setup
+   "5e+22"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 5e+22 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "1e6"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 1e6 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "-2E-2"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal -0.02 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "6.626e-34"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 6.626e-34 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "1E6"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 1e6 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "+1.5e10"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 1.5e10 numeric))
+     (should (floatp numeric)))))
 
 (ert-deftest toml-test-error:read-numeric ()
-  (dolist (str '("" "- 1.1" " 1.1" ".1" "1.1.1" "1.1.1.1"))
+  (dolist (str '("" "- 1.1" " 1.1" ".1" "1.1.1" "1.1.1.1"
+                 "1e" "1e+" "1e-" "1E+" "1." "1.e5"))
     (toml-test:buffer-setup
      str
      (should-error (toml:read-numeric) :type 'toml-numeric-error))))
