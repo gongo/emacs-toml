@@ -77,8 +77,10 @@ notes:
 \\(0[1-9]\\|[1-2][0-9]\\|3[0-1]\\)T\
 \\([0-1][0-9]\\|2[0-4]\\):\
 \\([0-5][0-9]\\):\
-\\([0-5][0-9]\\)Z"
-  "Regular expression for a datetime (Zulu time format).")
+\\([0-5][0-9]\\)\
+\\(?:\\.\\([0-9]+\\)\\)?\
+\\(Z\\|[+-][0-9]\\{2\\}:[0-9]\\{2\\}\\)"
+  "Regular expression for RFC 3339 datetime with timezone and fractional seconds.")
 
 (defconst toml->regexp-numeric
   "\\([+-]?[0-9]+[.0-9eE+-]*\\)"
@@ -279,18 +281,28 @@ Move point to the end of read boolean string."
     (signal 'toml-boolean-error (list (point))))))
 
 (defun toml:read-datetime ()
-  "Read datetime at point.
-Return time list (seconds, minutes, hour, day, month and year).
+  "Read RFC 3339 datetime at point.
+Return alist with keys: year, month, day, hour, minute, second,
+fraction, timezone.
 Move point to the end of read datetime string."
   (unless (toml:search-forward toml->regexp-datetime)
     (signal 'toml-datetime-error (list (point))))
-  (let ((seconds (string-to-number (match-string-no-properties 6)))
-        (minutes (string-to-number (match-string-no-properties 5)))
-        (hour    (string-to-number (match-string-no-properties 4)))
-        (day     (string-to-number (match-string-no-properties 3)))
-        (month   (string-to-number (match-string-no-properties 2)))
-        (year    (string-to-number (match-string-no-properties 1))))
-    (list seconds minutes hour day month year)))
+  (let ((year     (string-to-number (match-string-no-properties 1)))
+        (month    (string-to-number (match-string-no-properties 2)))
+        (day      (string-to-number (match-string-no-properties 3)))
+        (hour     (string-to-number (match-string-no-properties 4)))
+        (minute   (string-to-number (match-string-no-properties 5)))
+        (second   (string-to-number (match-string-no-properties 6)))
+        (fraction (match-string-no-properties 7))  ; optional
+        (timezone (match-string-no-properties 8))) ; Z or +HH:MM or -HH:MM
+    `((year . ,year)
+      (month . ,month)
+      (day . ,day)
+      (hour . ,hour)
+      (minute . ,minute)
+      (second . ,second)
+      (fraction . ,(when fraction (string-to-number (concat "0." fraction))))
+      (timezone . ,timezone))))
 
 (defun toml:read-numeric ()
   "Read numeric (integer or float) at point.  Return numeric.
