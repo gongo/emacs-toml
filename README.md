@@ -6,7 +6,7 @@ emacs-toml
 `toml.el` is a library for parsing TOML (Tom's Obvious, Minimal Language).
 
 * Learn all about TOML here: https://github.com/mojombo/toml
-* Support version: [v0.1.0](https://github.com/mojombo/toml/blob/master/versions/toml-v0.1.0.md)
+* Support version: [v0.2.0](https://github.com/toml-lang/toml/blob/main/CHANGELOG.md#020--2013-09-24)
 
 ## Example
 
@@ -76,7 +76,15 @@ hosts = \[
 ;;        ("ports" . [8001 8001 8002])
 ;;        ("server" . "192.168.1.1"))
 ;;       ("owner"
-;;        ("dob" 0 32 7 27 5 1979)
+;;        ("dob"
+;;         (year . 1979)
+;;         (month . 5)
+;;         (day . 27)
+;;         (hour . 7)
+;;         (minute . 32)
+;;         (second . 0)
+;;         (fraction)
+;;         (timezone . "Z"))
 ;;        ("bio" . "GitHub Cofounder & CEO\\nLikes tater tots and beer.")
 ;;        ("organization" . "GitHub")
 ;;        ("name" . "Tom Preston-Werner"))

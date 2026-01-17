@@ -109,8 +109,48 @@ aiueo"
 (ert-deftest toml-test:read-datetime ()
   (toml-test:buffer-setup
    "1979-05-27T07:32:00Z"
-   (should (equal '(0 32 7 27 5 1979) (toml:read-datetime)))
+   (let ((dt (toml:read-datetime)))
+     (should (equal 1979 (cdr (assoc 'year dt))))
+     (should (equal 5 (cdr (assoc 'month dt))))
+     (should (equal 27 (cdr (assoc 'day dt))))
+     (should (equal 7 (cdr (assoc 'hour dt))))
+     (should (equal 32 (cdr (assoc 'minute dt))))
+     (should (equal 0 (cdr (assoc 'second dt))))
+     (should (null (cdr (assoc 'fraction dt))))
+     (should (equal "Z" (cdr (assoc 'timezone dt)))))
    (should (toml:end-of-line-p))))
+
+(ert-deftest toml-test:read-datetime-with-timezone ()
+  (toml-test:buffer-setup
+   "1979-05-27T00:32:00-07:00"
+   (let ((dt (toml:read-datetime)))
+     (should (equal 1979 (cdr (assoc 'year dt))))
+     (should (equal 5 (cdr (assoc 'month dt))))
+     (should (equal 27 (cdr (assoc 'day dt))))
+     (should (equal 0 (cdr (assoc 'hour dt))))
+     (should (equal 32 (cdr (assoc 'minute dt))))
+     (should (equal 0 (cdr (assoc 'second dt))))
+     (should (null (cdr (assoc 'fraction dt))))
+     (should (equal "-07:00" (cdr (assoc 'timezone dt))))))
+
+  (toml-test:buffer-setup
+   "1979-05-27T00:32:00+05:30"
+   (let ((dt (toml:read-datetime)))
+     (should (equal "+05:30" (cdr (assoc 'timezone dt)))))))
+
+(ert-deftest toml-test:read-datetime-with-fractional-seconds ()
+  (toml-test:buffer-setup
+   "1979-05-27T00:32:00.999999-07:00"
+   (let ((dt (toml:read-datetime)))
+     (should (equal 1979 (cdr (assoc 'year dt))))
+     (should (equal 5 (cdr (assoc 'month dt))))
+     (should (equal 27 (cdr (assoc 'day dt))))
+     (should (equal 0 (cdr (assoc 'hour dt))))
+     (should (equal 32 (cdr (assoc 'minute dt))))
+     (should (equal 0 (cdr (assoc 'second dt))))
+     (should (floatp (cdr (assoc 'fraction dt))))
+     (should (equal 0.999999 (cdr (assoc 'fraction dt))))
+     (should (equal "-07:00" (cdr (assoc 'timezone dt)))))))
 
 (ert-deftest toml-test-error:read-datetime ()
   (dolist (str '("1979-05-27" "1979-35-27T07:32:00Z" " 1979-05-27T07:32:00Z"))
