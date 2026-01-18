@@ -240,36 +240,86 @@ Move point to the end of read characters."
       (concat "\\u" (match-string 0)))
      (t (signal 'toml-string-unicode-escape-error (list (point)))))))
 
+(defun toml:read-multiline-basic-string ()
+  "Read multiline basic string (enclosed in \"\"\") at point.
+Handles escape sequences, line-ending backslash continuation,
+and trims immediate newline after opening delimiter."
+  ;; Skip the opening """
+  (forward-char 3)
+  ;; Trim immediate newline after opening delimiter
+  (when (eq (toml:get-char-at-point) ?\n)
+    (forward-char))
+  (let ((characters '()))
+    (while (not (looking-at "\"\"\""))
+      (when (eobp)
+        (signal 'toml-string-error (list (point))))
+      (cond
+       ;; Line-ending backslash: trim the backslash, newline, and following whitespace
+       ((looking-at "\\\\[ \t]*\n[ \t\n]*")
+        (goto-char (match-end 0)))
+       (t
+        (let ((char (toml:get-char-at-point)))
+          ;; Regular escape sequence or regular character
+          (if (eq char ?\\)
+              (push (toml:read-escaped-char) characters)
+            (push (toml:read-char) characters))))))
+    ;; Skip the closing """
+    (forward-char 3)
+    (apply #'concat (nreverse characters))))
+
 (defun toml:read-string ()
   "Read string at point that surrounded by double quotation mark.
 Move point to the end of read strings."
   (unless (eq ?\" (toml:get-char-at-point))
     (signal 'toml-string-error (list (point))))
-  (let ((characters '())
-        (char (toml:read-char)))
-    (while (not (eq char ?\"))
-      (when (toml:end-of-line-p)
+  ;; Check for multiline string (""")
+  (if (looking-at "\"\"\"")
+      (toml:read-multiline-basic-string)
+    (let ((characters '())
+          (char (toml:read-char)))
+      (while (not (eq char ?\"))
+        (when (toml:end-of-line-p)
+          (signal 'toml-string-error (list (point))))
+        (push (if (eq char ?\\)
+                  (toml:read-escaped-char)
+                (toml:read-char))
+              characters)
+        (setq char (toml:get-char-at-point)))
+      (forward-char)
+      (apply 'concat (nreverse characters)))))
+
+(defun toml:read-multiline-literal-string ()
+  "Read multiline literal string (enclosed in ''') at point.
+No escape processing. Trims immediate newline after opening delimiter."
+  ;; Skip the opening '''
+  (forward-char 3)
+  ;; Trim immediate newline after opening delimiter
+  (when (eq (toml:get-char-at-point) ?\n)
+    (forward-char))
+  (let ((characters '()))
+    (while (not (looking-at "'''"))
+      (when (eobp)
         (signal 'toml-string-error (list (point))))
-      (push (if (eq char ?\\)
-                (toml:read-escaped-char)
-              (toml:read-char))
-            characters)
-      (setq char (toml:get-char-at-point)))
-    (forward-char)
-    (apply 'concat (nreverse characters))))
+      (push (toml:read-char) characters))
+    ;; Skip the closing '''
+    (forward-char 3)
+    (apply #'concat (nreverse characters))))
 
 (defun toml:read-literal-string ()
   "Read TOML literal string (enclosed in single quotes) at point."
   (unless (eq ?\' (toml:get-char-at-point))
     (signal 'toml-string-error (list (point))))
-  (forward-char)
-  (let ((characters '()))
-    (while (not (eq (toml:get-char-at-point) ?\'))
-      (when (toml:end-of-line-p)
-        (signal 'toml-string-error (list (point))))
-      (push (toml:read-char) characters))
+  ;; Check for multiline literal string (''')
+  (if (looking-at "'''")
+      (toml:read-multiline-literal-string)
     (forward-char)
-    (apply #'concat (nreverse characters))))
+    (let ((characters '()))
+      (while (not (eq (toml:get-char-at-point) ?\'))
+        (when (toml:end-of-line-p)
+          (signal 'toml-string-error (list (point))))
+        (push (toml:read-char) characters))
+      (forward-char)
+      (apply #'concat (nreverse characters)))))
 
 (defun toml:read-boolean ()
   "Read boolean at point.  Return t or nil.
