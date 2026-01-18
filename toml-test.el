@@ -59,10 +59,19 @@ aiueo"
    (should (equal ?u (toml:get-char-at-point)))))
 
 (ert-deftest toml-test:read-escaped-char ()
-  (dolist (char '("\\b" "\\t" "\\n" "\\f" "\\r" "\\\"" "\\\/" "\\\\" "\\u1234"))
+  (dolist (test '(("\\b" . "\b")
+                  ("\\t" . "\t")
+                  ("\\n" . "\n")
+                  ("\\f" . "\f")
+                  ("\\r" . "\r")
+                  ("\\\"" . "\"")
+                  ("\\/" . "/")
+                  ("\\\\" . "\\")
+                  ("\\u0041" . "A")
+                  ("\\u1234" . "\u1234")))
     (toml-test:buffer-setup
-     char
-     (should (equal char (toml:read-escaped-char)))
+     (car test)
+     (should (equal (cdr test) (toml:read-escaped-char)))
      (should (toml:end-of-line-p)))))
 
 (ert-deftest toml-test-error:read-escaped-char ()
@@ -74,7 +83,7 @@ aiueo"
 (ert-deftest toml-test:read-string ()
   (toml-test:buffer-setup
    "\"GitHub Cofounder & CEO\\nLikes tater tots and beer.\""
-   (should (equal "GitHub Cofounder & CEO\\nLikes tater tots and beer." (toml:read-string)))
+   (should (equal "GitHub Cofounder & CEO\nLikes tater tots and beer." (toml:read-string)))
    (should (toml:end-of-line-p))))
 
 (ert-deftest toml-test-error:read-string ()
@@ -816,11 +825,11 @@ Two\"\"\""
 (ert-deftest toml-test:read-multiline-basic-string-escapes ()
   (toml-test:buffer-setup
    "\"\"\"Line1\\nLine2\"\"\""
-   (should (equal "Line1\\nLine2" (toml:read-string))))
+   (should (equal "Line1\nLine2" (toml:read-string))))
 
   (toml-test:buffer-setup
    "\"\"\"Tab\\there\"\"\""
-   (should (equal "Tab\\there" (toml:read-string)))))
+   (should (equal "Tab\there" (toml:read-string)))))
 
 (ert-deftest toml-test:read-multiline-basic-string-quotes ()
   (toml-test:buffer-setup
