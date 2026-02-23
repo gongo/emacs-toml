@@ -476,16 +476,24 @@ Behavior differences:
 
 (defun toml:read-key ()
   (toml:seek-readable-point)
-  (cond
-   ((eobp) nil)
-   ;; If we're at a table header, return nil (no key to read)
-   ((char-equal (toml:get-char-at-point) ?\[) nil)
-   ((toml:search-forward "\\([a-zA-Z][a-zA-Z0-9_-]*\\) *= *")
-    (let ((key (match-string-no-properties 1)))
-      (when (string-match "_\\'" key)
-        (signal 'toml-key-error (list (point))))
-      key))
-   (t (signal 'toml-key-error (list (point))))))
+  (let ((key (condition-case err
+                 (cond
+                  ((eobp) nil)
+                  ;; If we're at a table header, return nil (no key to read)
+                  ((char-equal (toml:get-char-at-point) ?\[) nil)
+                  ((char-equal (toml:get-char-at-point) ?\") (toml:read-string))
+                  ((char-equal (toml:get-char-at-point) ?\') (toml:read-literal-string))
+                  ((toml:search-forward "\\([a-zA-Z][a-zA-Z0-9_-]*\\)")
+                   (let ((k (match-string-no-properties 1)))
+                     (when (string-match "_\\'" k)
+                       (signal 'toml-key-error (list (point))))
+                     k))
+                  (t (signal 'toml-key-error (list (point)))))
+               (toml-string-error
+                (signal 'toml-key-error (cdr err))))))
+    (unless (or (not key) (toml:search-forward " *= *"))
+      (signal 'toml-key-error (list (point))))
+    key))
 
 (defun toml:make-table-hashes (table-keys key value hashes)
   "Add VALUE to HASHES at TABLE-KEYS + KEY path, creating nested tables.
