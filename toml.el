@@ -47,7 +47,6 @@
     (?f . ?\f)    ; form feed       (U+000C)
     (?r . ?\r)    ; carriage return (U+000D)
     (?\" . ?\")   ; quote           (U+0022)
-    (?/ . ?/)     ; slash           (U+002F)
     (?\\ . ?\\))  ; backslash       (U+005C)
   "Alist mapping TOML escape characters to their actual values.
 Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
