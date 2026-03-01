@@ -77,11 +77,11 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
   "Regular expression for RFC 3339 datetime with timezone and fractional seconds.")
 
 (defconst toml->regexp-numeric
-  "\\([+-]?[0-9]+[.0-9eE+-]*\\)"
+  "\\([+-]?[0-9][_0-9]*[.0-9eE+_-]*\\)"
   "Regular expression for capturing numeric-like strings.")
 
 (defconst toml->regexp-numeric-strict
-  "^[+-]?[0-9]+\\(?:\\.[0-9]+\\)?\\(?:[eE][+-]?[0-9]+\\)?$"
+  "^[+-]?[0-9]+\\(?:_[0-9]+\\)*\\(?:\\.\\(?:[0-9]+\\(?:_[0-9]+\\)*\\)\\)?\\(?:[eE][+-]?[0-9]+\\(?:_[0-9]+\\)*\\)?$"
   "Strict regular expression for validating numeric format.")
 
 ;; Error conditions
@@ -372,7 +372,7 @@ Move point to the end of read numeric string."
     ;;    correct format (e.g., rejects "1e", "1.", "1.1.1").
     (unless (string-match-p toml->regexp-numeric-strict numeric-str)
       (signal 'toml-numeric-error (list (point))))
-    (string-to-number numeric-str)))
+    (string-to-number (replace-regexp-in-string "_" "" numeric-str))))
 
 (defun toml:read-start-with-number ()
   "Read string that start with number at point.

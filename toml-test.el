@@ -288,11 +288,40 @@ aiueo"
    (let ((numeric (toml:read-numeric)))
      (should (toml:end-of-line-p))
      (should (equal 1.5e10 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "1_000"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 1000 numeric))
+     (should (integerp numeric))))
+
+  (toml-test:buffer-setup
+   "5_349_221"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 5349221 numeric))
+     (should (integerp numeric))))
+
+  (toml-test:buffer-setup
+   "9_224_617.445_991_228_313"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 9224617.445991228313 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "1_0e1_0"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 1e11 numeric))
      (should (floatp numeric)))))
 
 (ert-deftest toml-test-error:read-numeric ()
   (dolist (str '("" "- 1.1" " 1.1" ".1" "1.1.1" "1.1.1.1"
-                 "1e" "1e+" "1e-" "1E+" "1." "1.e5"))
+                 "1e" "1e+" "1e-" "1E+" "1." "1.e5"
+                 "_1000" "1000_" "1__000" "1._0" "1.0_e5"))
     (toml-test:buffer-setup
      str
      (should-error (toml:read-numeric) :type 'toml-numeric-error))))
