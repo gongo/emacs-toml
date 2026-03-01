@@ -68,14 +68,26 @@ aiueo"
                   ("\\/" . "/")
                   ("\\\\" . "\\")
                   ("\\u0041" . "A")
-                  ("\\u1234" . "\u1234")))
+                  ("\\u1234" . "\u1234")
+                  ("\\U0001F600" . "😀")
+                  ("\\U00000041" . "A")))
     (toml-test:buffer-setup
      (car test)
      (should (equal (cdr test) (toml:read-escaped-char)))
      (should (toml:end-of-line-p)))))
 
 (ert-deftest toml-test-error:read-escaped-char ()
-  (dolist (char '(" " " \\b" "a" "\\a" "\\c" "\\uABC!" "\\u____"))
+  (dolist (char '(" "
+		  " \\b"
+		  "a"
+		  "\\a"
+		  "\\c"
+		  "\\uABC!"
+		  "\\u____"
+                  "\\UABCDEFG!"
+		  "\\U________"
+		  "\\U0001F60"
+		  ))
     (toml-test:buffer-setup
      char
      (should-error (toml:read-escaped-char) :type 'toml-string-escape-error))))

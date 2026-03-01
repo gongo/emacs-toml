@@ -233,6 +233,9 @@ Move point to the end of read characters."
      ((and (eq char ?u)
            (toml:search-forward "[0-9A-Fa-f]\\{4\\}"))
       (char-to-string (string-to-number (match-string 0) 16)))
+     ((and (eq char ?U)
+           (toml:search-forward "[0-9A-Fa-f]\\{8\\}"))
+      (char-to-string (string-to-number (match-string 0) 16)))
      (t (signal 'toml-string-unicode-escape-error (list (point)))))))
 
 (defun toml:read-multiline-basic-string ()
