@@ -68,8 +68,12 @@ aiueo"
                   ("\\\\" . "\\")
                   ("\\u0041" . "A")
                   ("\\u1234" . "\u1234")
+                  ("\\uD799" . "\uD799")
+                  ("\\uE000" . "\uE000")
                   ("\\U0001F600" . "😀")
-                  ("\\U00000041" . "A")))
+                  ("\\U00000041" . "A")
+                  ("\\U0010FFFF" . "\U0010FFFF")
+                  ))
     (toml-test:buffer-setup
      (car test)
      (should (equal (cdr test) (toml:read-escaped-char)))
@@ -87,6 +91,11 @@ aiueo"
                   "\\UABCDEFG!"
 		  "\\U________"
 		  "\\U0001F60"
+		  "\\uD800"
+		  "\\uDFFF"
+		  "\\U0000D800"
+		  "\\U0000DFFF"
+		  "\\U00110000"
 		  ))
     (toml-test:buffer-setup
      char
