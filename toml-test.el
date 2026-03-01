@@ -529,8 +529,7 @@ c = 2"
 
 (ert-deftest toml-test-error:read-literal-string ()
   (dolist (case '(("'unterminated string"   . toml-string-error)
-                   ;; TODO: perhaps add unsupported err?
-                  ("'''"                    . toml-key-error)))
+                  ("'''"                    . toml-string-error)))
     (let* ((input (concat "x = " (car case)))
            (expected-error (cdr case)))
       (toml-test:buffer-setup
@@ -787,3 +786,127 @@ name = \"Jane\""
          (should (equal "Emacs Manual" (cdr (assoc "title" book2))))
          (let ((author (cdr (assoc "author" book2))))
            (should (equal "Jane" (cdr (assoc "name" author))))))))))
+
+(ert-deftest toml-test:read-multiline-basic-string ()
+  (toml-test:buffer-setup
+   "\"\"\"Hello
+World\"\"\""
+   (should (equal "Hello\nWorld" (toml:read-string))))
+
+  (toml-test:buffer-setup
+   "\"\"\"
+One
+Two\"\"\""
+   (should (equal "One\nTwo" (toml:read-string)))))
+
+(ert-deftest toml-test:read-multiline-basic-string-line-continuation ()
+  (toml-test:buffer-setup
+   "\"\"\"The quick brown \\
+    fox jumps over \\
+    the lazy dog.\"\"\""
+   (should (equal "The quick brown fox jumps over the lazy dog." (toml:read-string))))
+
+  (toml-test:buffer-setup
+   "\"\"\"The quick \\
+
+
+    fox\"\"\""
+   (should (equal "The quick fox" (toml:read-string)))))
+
+(ert-deftest toml-test:read-multiline-basic-string-escapes ()
+  (toml-test:buffer-setup
+   "\"\"\"Line1\\nLine2\"\"\""
+   (should (equal "Line1\\nLine2" (toml:read-string))))
+
+  (toml-test:buffer-setup
+   "\"\"\"Tab\\there\"\"\""
+   (should (equal "Tab\\there" (toml:read-string)))))
+
+(ert-deftest toml-test:read-multiline-basic-string-quotes ()
+  (toml-test:buffer-setup
+   "\"\"\"Hello \"\"World\"\"\""
+   (should (equal "Hello \"\"World" (toml:read-string))))
+
+  (toml-test:buffer-setup
+   "\"\"\"Say \"Hello\" to me\"\"\""
+   (should (equal "Say \"Hello\" to me" (toml:read-string)))))
+
+(ert-deftest toml-test:read-multiline-basic-string-empty ()
+  (toml-test:buffer-setup
+   "\"\"\"\"\"\""
+   (should (equal "" (toml:read-string)))))
+
+(ert-deftest toml-test-error:read-multiline-basic-string-unterminated ()
+  (toml-test:buffer-setup
+   "\"\"\"unterminated"
+   (should-error (toml:read-string) :type 'toml-string-error)))
+
+(ert-deftest toml-test:read-multiline-literal-string ()
+  (toml-test:buffer-setup
+   "'''Hello
+World'''"
+   (should (equal "Hello\nWorld" (toml:read-literal-string))))
+
+  (toml-test:buffer-setup
+   "'''
+Text here'''"
+   (should (equal "Text here" (toml:read-literal-string)))))
+
+(ert-deftest toml-test:read-multiline-literal-string-no-escapes ()
+  (toml-test:buffer-setup
+   "'''I [dw]on't need \\d{2} apples'''"
+   (should (equal "I [dw]on't need \\d{2} apples" (toml:read-literal-string))))
+
+  (toml-test:buffer-setup
+   "'''line1\\
+line2'''"
+   (should (equal "line1\\\nline2" (toml:read-literal-string)))))
+
+(ert-deftest toml-test:read-multiline-literal-string-quotes ()
+  (toml-test:buffer-setup
+   "'''Hello ''World'''"
+   (should (equal "Hello ''World" (toml:read-literal-string)))))
+
+(ert-deftest toml-test:read-multiline-literal-string-empty ()
+  (toml-test:buffer-setup
+   "''''''"
+   (should (equal "" (toml:read-literal-string)))))
+
+(ert-deftest toml-test-error:read-multiline-literal-string-unterminated ()
+  (toml-test:buffer-setup
+   "'''unterminated"
+   (should-error (toml:read-literal-string) :type 'toml-string-error)))
+
+
+(ert-deftest toml-test:parse-multiline-strings ()
+  (toml-test:buffer-setup
+   "str1 = \"\"\"
+Roses are red
+Violets are blue\"\"\"
+
+str2 = '''
+The first newline is
+trimmed in raw strings.
+   All other whitespace
+   is preserved.
+'''"
+   (let ((parsed (toml:read)))
+     (should (equal "Roses are red\nViolets are blue"
+                    (cdr (assoc "str1" parsed))))
+     (should (equal "The first newline is\ntrimmed in raw strings.\n   All other whitespace\n   is preserved.\n"
+                    (cdr (assoc "str2" parsed))))))
+
+  (toml-test:buffer-setup
+   "[section]
+multiline = \"\"\"
+This is a
+multiline value
+\"\"\"
+
+regex = '''\\d{4}-\\d{2}-\\d{2}'''
+"
+   (let ((parsed (toml:read)))
+     (should (equal "This is a\nmultiline value\n"
+                    (cdr (assoc "multiline" (cdr (assoc "section" parsed))))))
+     (should (equal "\\d{4}-\\d{2}-\\d{2}"
+                    (cdr (assoc "regex" (cdr (assoc "section" parsed)))))))))
