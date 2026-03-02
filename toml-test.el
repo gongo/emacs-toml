@@ -405,6 +405,50 @@ aiueo"
   ;;  (should-error (toml:read-array) :type 'toml-array-error))
   )
 
+(ert-deftest toml-test:read-inline-table ()
+  (toml-test:buffer-setup
+   "{}"
+   (should (equal '() (toml:read-inline-table))))
+
+  (toml-test:buffer-setup
+   "{ name = \"Tom\" }"
+   (let ((result (toml:read-inline-table)))
+     (should (equal "Tom" (cdr (assoc "name" result))))))
+
+  (toml-test:buffer-setup
+   "{ first = \"Tom\", last = \"Preston-Werner\" }"
+   (let ((result (toml:read-inline-table)))
+     (should (equal "Tom" (cdr (assoc "first" result))))
+     (should (equal "Preston-Werner" (cdr (assoc "last" result))))))
+
+  (toml-test:buffer-setup
+   "{ x = 1, y = 2 }"
+   (let ((result (toml:read-inline-table)))
+     (should (equal 1 (cdr (assoc "x" result))))
+     (should (equal 2 (cdr (assoc "y" result))))))
+
+  (toml-test:buffer-setup
+   "{ inner = { key = \"value\" } }"
+   (let ((result (toml:read-inline-table)))
+     (should (equal "value" (cdr (assoc "key" (cdr (assoc "inner" result))))))))
+
+  (toml-test:buffer-setup
+   "{ ports = [8001, 8002] }"
+   (let ((result (toml:read-inline-table)))
+     (should (equal [8001 8002] (cdr (assoc "ports" result)))))))
+
+(ert-deftest toml-test-error:read-inline-table ()
+  ;; Missing comma between key-value pairs
+  (toml-test:buffer-setup
+   "{ a = 1 b = 2 }"
+   (should-error (toml:read-inline-table) :type 'toml-inline-table-error))
+
+  ;; TODO: Trailing comma in inline tables is allowed from TOML v1.1.0.
+  ;; Until then, it should be rejected.
+  (toml-test:buffer-setup
+   "{ a = 1, b = 2, }"
+   (should-error (toml:read-inline-table) :type 'toml-inline-table-error)))
+
 (ert-deftest toml-test:read-table ()
   (toml-test:buffer-setup
    "[aiueo]"
