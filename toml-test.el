@@ -572,7 +572,7 @@ b = 1
 \[a.b\]
 c = 2"
    (should-error (toml:read) :type 'toml-redefine-key-error))
-)
+  )
 
 (ert-deftest toml-test:read-literal-string ()
   (toml-test:buffer-setup
@@ -936,6 +936,27 @@ line2'''"
    "'''unterminated"
    (should-error (toml:read-literal-string) :type 'toml-string-error)))
 
+(ert-deftest toml-test:parse-crlf ()
+  "Test that CRLF line endings are handled correctly."
+  (let ((parsed (toml:read-from-string "key1 = \"value1\"\r\nkey2 = \"value2\"")))
+    (should (equal "value1" (cdr (assoc "key1" parsed))))
+    (should (equal "value2" (cdr (assoc "key2" parsed)))))
+
+  (let ((parsed (toml:read-from-string "[section]\r\nkey = 42\r\n")))
+    (should (equal 42 (cdr (assoc "key" (cdr (assoc "section" parsed))))))))
+
+(ert-deftest toml-test:read-multiline-basic-string-crlf ()
+  "Test multiline basic strings with CRLF line endings."
+  (let ((parsed (toml:read-from-string "key = \"\"\"\r\nHello\r\nWorld\"\"\"")))
+    (should (equal "Hello\nWorld" (cdr (assoc "key" parsed)))))
+
+  (let ((parsed (toml:read-from-string "key = \"\"\"The quick brown \\\r\n    fox\"\"\"")))
+    (should (equal "The quick brown fox" (cdr (assoc "key" parsed))))))
+
+(ert-deftest toml-test:read-multiline-literal-string-crlf ()
+  "Test multiline literal strings with CRLF line endings."
+  (let ((parsed (toml:read-from-string "key = '''\r\nHello\r\nWorld'''")))
+    (should (equal "Hello\nWorld" (cdr (assoc "key" parsed))))))
 
 (ert-deftest toml-test:parse-multiline-strings ()
   (toml-test:buffer-setup
