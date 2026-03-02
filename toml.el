@@ -788,6 +788,7 @@ Example:
   "Read the TOML object contained in STRING and return it."
   (with-temp-buffer
     (insert string)
+    (toml:--normalize-newlines)
     (goto-char (point-min))
     (toml:read)))
 
@@ -795,8 +796,19 @@ Example:
   "Read the TOML object contained in FILE and return it."
   (with-temp-buffer
     (insert-file-contents file)
+    (toml:--normalize-newlines)
     (goto-char (point-min))
     (toml:read)))
+
+(defun toml:--normalize-newlines ()
+  "Replace CRLF with LF in the current buffer.
+The TOML spec allows parsers to normalize newlines to whatever
+makes sense for their platform (see toml-lang/toml#281).
+On Unix-like systems, normalizing CRLF to LF at the entry point
+keeps the parser simple while correctly rejecting bare CR."
+  (goto-char (point-min))
+  (while (search-forward "\r\n" nil t)
+    (replace-match "\n" t t)))
 
 (provide 'toml)
 
