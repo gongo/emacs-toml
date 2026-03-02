@@ -147,6 +147,10 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 (put 'toml-array-table-error 'error-conditions
      '(toml-array-table-error toml-error error))
 
+(put 'toml-inline-table-error 'error-message "Bad inline table")
+(put 'toml-inline-table-error 'error-conditions
+     '(toml-inline-table-error toml-error error))
+
 (defun toml:assoc (keys hash)
   "Look up nested KEYS in HASH and return the found element.
 
@@ -417,8 +421,12 @@ Move point to the end of read string."
         (if (char-equal char-after-read ?,)
             (progn
               (forward-char)
-              (toml:seek-readable-point))
-          (signal 'toml-array-error (list (point))))))
+              (toml:seek-readable-point)
+              ;; TODO: Trailing comma in inline tables is allowed from TOML v1.1.0.
+              ;; Until then, it should be rejected.
+              (when (char-equal (toml:get-char-at-point) ?})
+                (signal 'toml-inline-table-error (list (point)))))
+          (signal 'toml-inline-table-error (list (point))))))
     (forward-char)
     (nreverse elements)))
 
@@ -770,11 +778,11 @@ Example:
         (if current-array-table
             ;; Add to array table element
             (setq hashes (toml:add-to-array-table current-array-table
-                                                   current-array-sub-keys
-                                                   current-key
-                                                   current-value
-                                                   hashes
-                                                   array-table-registry))
+                                                  current-array-sub-keys
+                                                  current-key
+                                                  current-value
+                                                  hashes
+                                                  array-table-registry))
           ;; Add to regular table
           (setq hashes (toml:make-table-hashes current-table
                                                current-key
