@@ -553,7 +553,7 @@ Example:
   ;; => ((\"products\" . [nil]))
 
   (toml:make-array-table-hashes \\='(\"products\")
-                                \\='((\"products\" . [nil])))
+                                \\=`((\"products\" . ,(vector nil))))
   ;; => ((\"products\" . [nil nil]))"
   (if (null array-keys)
       hashes
@@ -580,12 +580,12 @@ Example:
               (if (vectorp current-val)
                   ;; Extend existing array with new empty element
                   (progn
-                    (setcdr existing (vconcat current-val [nil]))
+                    (setcdr existing (vconcat current-val (vector nil)))
                     hashes)
                 ;; Conflict: trying to redefine non-array as array table
                 (signal 'toml-array-table-error (list (point)))))
           ;; Create new array with one empty element
-          (cons (cons key [nil]) hashes)))
+          (cons (cons key (vector nil)) hashes)))
        ;; More keys to traverse - recurse
        (t
         (let* ((children (if existing (cdr existing) nil))
@@ -610,9 +610,9 @@ Returns updated hashes."
             ;; Extend existing nested array
             (let ((child-array (cdr existing-child)))
               (when (vectorp child-array)
-                (setcdr existing-child (vconcat child-array [nil]))))
+                (setcdr existing-child (vconcat child-array (vector nil)))))
           ;; Create new nested array
-          (let ((new-elem (cons (cons child-key [nil]) current-elem)))
+          (let ((new-elem (cons (cons child-key (vector nil)) current-elem)))
             (aset parent-array parent-index new-elem)))))
     hashes))
 
