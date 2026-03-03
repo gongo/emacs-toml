@@ -350,7 +350,39 @@ aiueo"
   (toml-test:buffer-setup
    "server12 = name"
    (should (equal "server12" (toml:read-key)))
-   (should (eq ?n (toml:get-char-at-point)))))
+   (should (eq ?n (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "'key' = name"
+   (should (equal "key" (toml:read-key)))
+   (should (eq ?n (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "\"key\" = name"
+   (should (equal "key" (toml:read-key)))
+   (should (eq ?n (toml:get-char-at-point))))
+
+  ;; (toml-test:buffer-setup
+  ;;  "\"key\\n\" = name"
+  ;;  (should (equal "key\n" (toml:read-key)))
+  ;;  (should (eq ?n (toml:get-char-at-point))))
+
+  ;; (toml-test:buffer-setup
+  ;;  "'key\\n' = name"
+  ;;  (should (equal "key\\n" (toml:read-key)))
+  ;;  (should (eq ?n (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "'' = name"
+   (should (equal "" (toml:read-key)))
+   (should (eq ?n (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "\"\" = name"
+   (should (equal "" (toml:read-key)))
+   (should (eq ?n (toml:get-char-at-point))))
+  )
+
 
 (ert-deftest toml-test-error:read-key ()
   ;; no key
@@ -371,7 +403,14 @@ aiueo"
   ;; end with underscore
   (toml-test:buffer-setup
    "connection_ = 5000"
-   (should-error (toml:read-key) :type 'toml-key-error)))
+   (should-error (toml:read-key) :type 'toml-key-error))
+
+  ;; multiline not allowed
+  (toml-test:buffer-setup
+   "\"key\nagain\" = name"
+   (should-error (toml:read-key) :type 'toml-key-error))
+  )
+
 
 (ert-deftest toml-test:read-array ()
   (toml-test:buffer-setup
