@@ -457,11 +457,11 @@ Behavior differences:
     (while (and (not (eobp))
                 (or (null table-type) (eq table-type 'single))
                 (char-equal (toml:get-char-at-point) ?\[))
-      (if (toml:search-forward "\\(\\[\\{1,2\\}\\)\\([a-zA-Z][a-zA-Z0-9_\\.-]*\\)\\(\\]\\{1,2\\}\\)")
+      (if (toml:search-forward "\\(\\[\\{1,2\\}\\)\\([A-Za-z0-9_-][A-Za-z0-9_\\.-]*\\)\\(\\]\\{1,2\\}\\)")
           (let* ((brackets-before (match-string-no-properties 1)) ;;  "["  in "[xxx]"
                  (brackets-after (match-string-no-properties 3))  ;;  "]"  in "[xxx]"
                  (table-string (match-string-no-properties 2)))   ;; "xxx" in "[xxx]"
-            (when (string-match "\\(_\\|\\.\\)\\'" table-string)
+            (when (string-match "\\.\\'" table-string)
               (signal 'toml-table-error (list (point))))
             (unless (= (length brackets-before) (length brackets-after))
               (signal 'toml-table-error (list (point))))
@@ -483,11 +483,8 @@ Behavior differences:
                   ((char-equal (toml:get-char-at-point) ?\[) nil)
                   ((char-equal (toml:get-char-at-point) ?\") (toml:read-string))
                   ((char-equal (toml:get-char-at-point) ?\') (toml:read-literal-string))
-                  ((toml:search-forward "\\([a-zA-Z][a-zA-Z0-9_-]*\\)")
-                   (let ((k (match-string-no-properties 1)))
-                     (when (string-match "_\\'" k)
-                       (signal 'toml-key-error (list (point))))
-                     k))
+                  ((toml:search-forward "\\([A-Za-z0-9_-]+\\)")
+                   (match-string-no-properties 1))
                   (t (signal 'toml-key-error (list (point)))))
                (toml-string-error
                 (signal 'toml-key-error (cdr err))))))
