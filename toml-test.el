@@ -381,6 +381,26 @@ aiueo"
    "\"\" = name"
    (should (equal "" (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "1biueo = true"
+   (should (equal "1biueo" (toml:read-key)))
+   (should (eq ?t (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "connection_ = 5000"
+   (should (equal "connection_" (toml:read-key)))
+   (should (eq ?5 (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "1234 = 42"
+   (should (equal "1234" (toml:read-key)))
+   (should (eq ?4 (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "_ = 1"
+   (should (equal "_" (toml:read-key)))
+   (should (eq ?1 (toml:get-char-at-point))))
   )
 
 
@@ -393,16 +413,6 @@ aiueo"
   ;; key only
   (toml-test:buffer-setup
    "key"
-   (should-error (toml:read-key) :type 'toml-key-error))
-
-  ;; start with number.
-  (toml-test:buffer-setup
-   "1biueo = true"
-   (should-error (toml:read-key) :type 'toml-key-error))
-
-  ;; end with underscore
-  (toml-test:buffer-setup
-   "connection_ = 5000"
    (should-error (toml:read-key) :type 'toml-key-error))
 
   ;; multiline not allowed
@@ -520,6 +530,14 @@ aiueo"
    (should (equal '(:type array :keys ("ai-ueo")) (toml:read-table))))
 
   (toml-test:buffer-setup
+   "[1234]"
+   (should (equal '(:type single :keys ("1234")) (toml:read-table))))
+
+  (toml-test:buffer-setup
+   "[foo.bar_]"
+   (should (equal '(:type single :keys ("foo" "bar_")) (toml:read-table))))
+
+  (toml-test:buffer-setup
    "[[servers]]
     [[servers.alpha]]
 
@@ -537,11 +555,6 @@ aiueo"
 (ert-deftest toml-test-error:read-table ()
   (toml-test:buffer-setup
    "[]"
-   (should-error (toml:read-table) :type 'toml-table-error))
-
-  ;; end with underscore "_"
-  (toml-test:buffer-setup
-   "[foo.bar_]"
    (should-error (toml:read-table) :type 'toml-table-error))
 
   ;; end with period "."
