@@ -921,6 +921,57 @@ ip = \"192.168.1.1\""
            (should (= 1 (length interfaces)))
            (should (equal "192.168.1.1" (cdr (assoc "ip" (aref interfaces 0)))))))))))
 
+;; Dotted key tests
+
+(ert-deftest toml-test:parse-dotted-key-basic ()
+  "Test basic dotted key parsing."
+  (let ((parsed (toml:read-from-string "
+physical.color = \"orange\"
+physical.shape = \"round\"")))
+    (should (equal "orange" (cdr (assoc "color" (cdr (assoc "physical" parsed))))))
+    (should (equal "round" (cdr (assoc "shape" (cdr (assoc "physical" parsed))))))))
+
+(ert-deftest toml-test:parse-dotted-key-with-quoted-segment ()
+  "Test dotted key with quoted key segments."
+  (let ((parsed (toml:read-from-string "site.\"google.com\" = true")))
+    (should (equal t (cdr (assoc "google.com" (cdr (assoc "site" parsed))))))))
+
+(ert-deftest toml-test:parse-dotted-key-under-table ()
+  "Test dotted key under a table header."
+  (let ((parsed (toml:read-from-string "
+[fruit]
+physical.color = \"orange\"
+physical.shape = \"round\"")))
+    (let ((fruit (cdr (assoc "fruit" parsed))))
+      (should (equal "orange" (cdr (assoc "color" (cdr (assoc "physical" fruit))))))
+      (should (equal "round" (cdr (assoc "shape" (cdr (assoc "physical" fruit)))))))))
+
+(ert-deftest toml-test:parse-dotted-key-with-spaces ()
+  "Test dotted key with spaces around dot."
+  (let ((parsed (toml:read-from-string "fruit . color = \"red\"")))
+    (should (equal "red" (cdr (assoc "color" (cdr (assoc "fruit" parsed))))))))
+
+(ert-deftest toml-test:parse-dotted-key-in-inline-table ()
+  "Test dotted key inside inline table."
+  (let ((parsed (toml:read-from-string "point = { x.y = 1, x.z = 2 }")))
+    (let ((point (cdr (assoc "point" parsed))))
+      (should (equal 1 (cdr (assoc "y" (cdr (assoc "x" point))))))
+      (should (equal 2 (cdr (assoc "z" (cdr (assoc "x" point)))))))))
+
+(ert-deftest toml-test:parse-dotted-key-in-array-of-tables ()
+  "Test dotted key inside array of tables."
+  (let ((parsed (toml:read-from-string "
+[[fruits]]
+physical.color = \"red\"
+
+[[fruits]]
+physical.color = \"yellow\"")))
+    (let ((fruits (cdr (assoc "fruits" parsed))))
+      (should (vectorp fruits))
+      (should (= 2 (length fruits)))
+      (should (equal "red" (cdr (assoc "color" (cdr (assoc "physical" (aref fruits 0)))))))
+      (should (equal "yellow" (cdr (assoc "color" (cdr (assoc "physical" (aref fruits 1))))))))))
+
 (ert-deftest toml-test:read-array-table-with-nested-subtable ()
   "Test array of tables with deeply nested sub-tables."
   (toml-test:buffer-setup

@@ -412,9 +412,21 @@ Move point to the end of read string."
   (forward-char)
   (let (elements char-after-read)
     (while (not (char-equal (toml:get-char-at-point) ?}))
-      (let ((key (toml:read-key))
-            (value (toml:read-value)))
-        (push `(,key . ,value) elements))
+      (let* ((key-segments (toml:read-key))
+             (value (toml:read-value)))
+        (if (= 1 (length key-segments))
+            ;; Simple key: traditional (key . value)
+            (push `(,(car key-segments) . ,value) elements)
+          ;; Dotted key: build nested structure
+          (let* ((table-path (butlast key-segments))
+                 (leaf-key (car (last key-segments)))
+                 (nested (toml:make-table-hashes table-path leaf-key value nil)))
+            ;; Merge with existing elements (for cases like x.y=1, x.z=2)
+            (dolist (entry nested)
+              (let ((existing (assoc (car entry) elements)))
+                (if (and existing (toml:alistp (cdr existing)) (toml:alistp (cdr entry)))
+                    (setcdr existing (append (cdr existing) (cdr entry)))
+                  (push entry elements)))))))
       (toml:seek-readable-point)
       (setq char-after-read (toml:get-char-at-point))
       (unless (char-equal char-after-read ?})
@@ -789,32 +801,34 @@ Example:
             (signal 'toml-redefine-key-error (list (point))))))
 
       ;; Read key-value pair
-      (setq current-key (toml:read-key))
-      (when current-key
-        ;; Check for key redefinition
-        (let ((full-path (if current-array-table
-                             ;; For array tables, we don't check global redefinition
-                             nil
-                           (append current-table (list current-key)))))
-          (when (and full-path (toml:assoc full-path hashes))
-            (signal 'toml-redefine-key-error (list (point)))))
+      (let ((key-segments (toml:read-key)))
+        (when key-segments
+          (let* ((dotted-table (butlast key-segments))
+                 (leaf-key (car (last key-segments)))
+                 (effective-table (append current-table dotted-table)))
+            ;; Check for key redefinition
+            (let ((full-path (if current-array-table
+                                 nil
+                               (append effective-table (list leaf-key)))))
+              (when (and full-path (toml:assoc full-path hashes))
+                (signal 'toml-redefine-key-error (list (point)))))
 
-        (setq current-value (toml:read-value))
+            (setq current-value (toml:read-value))
 
-        ;; Add to appropriate structure
-        (if current-array-table
-            ;; Add to array table element
-            (setq hashes (toml:add-to-array-table current-array-table
-                                                  current-array-sub-keys
-                                                  current-key
-                                                  current-value
-                                                  hashes
-                                                  array-table-registry))
-          ;; Add to regular table
-          (setq hashes (toml:make-table-hashes current-table
-                                               current-key
-                                               current-value
-                                               hashes))))
+            ;; Add to appropriate structure
+            (if current-array-table
+                ;; Add to array table element
+                (setq hashes (toml:add-to-array-table current-array-table
+                                                      (append current-array-sub-keys dotted-table)
+                                                      leaf-key
+                                                      current-value
+                                                      hashes
+                                                      array-table-registry))
+              ;; Add to regular table
+              (setq hashes (toml:make-table-hashes effective-table
+                                                   leaf-key
+                                                   current-value
+                                                   hashes))))))
 
       (toml:seek-readable-point))
     hashes))
