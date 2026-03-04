@@ -811,7 +811,15 @@ Example:
                                  nil
                                (append effective-table (list leaf-key)))))
               (when (and full-path (toml:assoc full-path hashes))
-                (signal 'toml-redefine-key-error (list (point)))))
+                (signal 'toml-redefine-key-error (list (point))))
+              ;; Check that intermediate dotted-table paths are not non-table values
+              (when (and full-path dotted-table)
+                (let ((prefix current-table))
+                  (dolist (seg dotted-table)
+                    (setq prefix (append prefix (list seg)))
+                    (let ((existing (toml:assoc prefix hashes)))
+                      (when (and existing (not (toml:alistp (cdr existing))))
+                        (signal 'toml-redefine-key-error (list (point)))))))))
 
             (setq current-value (toml:read-value))
 

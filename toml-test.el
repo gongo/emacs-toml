@@ -972,6 +972,20 @@ physical.color = \"yellow\"")))
       (should (equal "red" (cdr (assoc "color" (cdr (assoc "physical" (aref fruits 0)))))))
       (should (equal "yellow" (cdr (assoc "color" (cdr (assoc "physical" (aref fruits 1))))))))))
 
+(ert-deftest toml-test-error:parse-dotted-key-redefine ()
+  "Test that redefining a dotted key is an error."
+  (should-error (toml:read-from-string "
+a.b = 1
+a.b = 2")
+                :type 'toml-redefine-key-error))
+
+(ert-deftest toml-test-error:parse-dotted-key-extend-non-table ()
+  "Test that extending a non-table value with dotted key is an error."
+  (should-error (toml:read-from-string "
+a.b = 1
+a.b.c = 2")
+                :type 'toml-redefine-key-error))
+
 (ert-deftest toml-test:read-array-table-with-nested-subtable ()
   "Test array of tables with deeply nested sub-tables."
   (toml-test:buffer-setup
