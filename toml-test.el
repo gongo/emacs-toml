@@ -329,83 +329,96 @@ aiueo"
 (ert-deftest toml-test:read-key ()
   (toml-test:buffer-setup
    "a = 3"
-   (should (equal "a" (toml:read-key)))
+   (should (equal '("a") (toml:read-key)))
    (should (eq ?3 (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "biueo = true"
-   (should (equal "biueo" (toml:read-key)))
+   (should (equal '("biueo") (toml:read-key)))
    (should (eq ?t (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "connection_max = 5000"
-   (should (equal "connection_max" (toml:read-key)))
+   (should (equal '("connection_max") (toml:read-key)))
    (should (eq ?5 (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "connection-max = name"
-   (should (equal "connection-max" (toml:read-key)))
+   (should (equal '("connection-max") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "server12 = name"
-   (should (equal "server12" (toml:read-key)))
+   (should (equal '("server12") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "'key' = name"
-   (should (equal "key" (toml:read-key)))
+   (should (equal '("key") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "\"key\" = name"
-   (should (equal "key" (toml:read-key)))
+   (should (equal '("key") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
-
-  ;; (toml-test:buffer-setup
-  ;;  "\"key\\n\" = name"
-  ;;  (should (equal "key\n" (toml:read-key)))
-  ;;  (should (eq ?n (toml:get-char-at-point))))
-
-  ;; (toml-test:buffer-setup
-  ;;  "'key\\n' = name"
-  ;;  (should (equal "key\\n" (toml:read-key)))
-  ;;  (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "'' = name"
-   (should (equal "" (toml:read-key)))
+   (should (equal '("") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "\"\" = name"
-   (should (equal "" (toml:read-key)))
+   (should (equal '("") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "1biueo = true"
-   (should (equal "1biueo" (toml:read-key)))
+   (should (equal '("1biueo") (toml:read-key)))
    (should (eq ?t (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "connection_ = 5000"
-   (should (equal "connection_" (toml:read-key)))
+   (should (equal '("connection_") (toml:read-key)))
    (should (eq ?5 (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "1234 = 42"
-   (should (equal "1234" (toml:read-key)))
+   (should (equal '("1234") (toml:read-key)))
    (should (eq ?4 (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "_ = 1"
-   (should (equal "_" (toml:read-key)))
+   (should (equal '("_") (toml:read-key)))
    (should (eq ?1 (toml:get-char-at-point))))
+
+  ;; Dotted keys
+  (toml-test:buffer-setup
+   "physical.color = \"orange\""
+   (should (equal '("physical" "color") (toml:read-key)))
+   (should (eq ?\" (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "a.b.c = 1"
+   (should (equal '("a" "b" "c") (toml:read-key)))
+   (should (eq ?1 (toml:get-char-at-point))))
+
+  ;; Dotted key with spaces around dot
+  (toml-test:buffer-setup
+   "fruit . color = \"red\""
+   (should (equal '("fruit" "color") (toml:read-key)))
+   (should (eq ?\" (toml:get-char-at-point))))
+
+  ;; Dotted key with quoted segments
+  (toml-test:buffer-setup
+   "site.\"google.com\" = true"
+   (should (equal '("site" "google.com") (toml:read-key)))
+   (should (eq ?t (toml:get-char-at-point))))
   )
 
 
 (ert-deftest toml-test-error:read-key ()
-  ;; no key
+  ;; no key - "=" doesn't match any key pattern, so read-key-segment signals error
   (toml-test:buffer-setup
    " = 3"
    (should-error (toml:read-key) :type 'toml-key-error))
@@ -907,6 +920,71 @@ ip = \"192.168.1.1\""
            (should (vectorp interfaces))
            (should (= 1 (length interfaces)))
            (should (equal "192.168.1.1" (cdr (assoc "ip" (aref interfaces 0)))))))))))
+
+;; Dotted key tests
+
+(ert-deftest toml-test:parse-dotted-key-basic ()
+  "Test basic dotted key parsing."
+  (let ((parsed (toml:read-from-string "
+physical.color = \"orange\"
+physical.shape = \"round\"")))
+    (should (equal "orange" (cdr (assoc "color" (cdr (assoc "physical" parsed))))))
+    (should (equal "round" (cdr (assoc "shape" (cdr (assoc "physical" parsed))))))))
+
+(ert-deftest toml-test:parse-dotted-key-with-quoted-segment ()
+  "Test dotted key with quoted key segments."
+  (let ((parsed (toml:read-from-string "site.\"google.com\" = true")))
+    (should (equal t (cdr (assoc "google.com" (cdr (assoc "site" parsed))))))))
+
+(ert-deftest toml-test:parse-dotted-key-under-table ()
+  "Test dotted key under a table header."
+  (let ((parsed (toml:read-from-string "
+[fruit]
+physical.color = \"orange\"
+physical.shape = \"round\"")))
+    (let ((fruit (cdr (assoc "fruit" parsed))))
+      (should (equal "orange" (cdr (assoc "color" (cdr (assoc "physical" fruit))))))
+      (should (equal "round" (cdr (assoc "shape" (cdr (assoc "physical" fruit)))))))))
+
+(ert-deftest toml-test:parse-dotted-key-with-spaces ()
+  "Test dotted key with spaces around dot."
+  (let ((parsed (toml:read-from-string "fruit . color = \"red\"")))
+    (should (equal "red" (cdr (assoc "color" (cdr (assoc "fruit" parsed))))))))
+
+(ert-deftest toml-test:parse-dotted-key-in-inline-table ()
+  "Test dotted key inside inline table."
+  (let ((parsed (toml:read-from-string "point = { x.y = 1, x.z = 2 }")))
+    (let ((point (cdr (assoc "point" parsed))))
+      (should (equal 1 (cdr (assoc "y" (cdr (assoc "x" point))))))
+      (should (equal 2 (cdr (assoc "z" (cdr (assoc "x" point)))))))))
+
+(ert-deftest toml-test:parse-dotted-key-in-array-of-tables ()
+  "Test dotted key inside array of tables."
+  (let ((parsed (toml:read-from-string "
+[[fruits]]
+physical.color = \"red\"
+
+[[fruits]]
+physical.color = \"yellow\"")))
+    (let ((fruits (cdr (assoc "fruits" parsed))))
+      (should (vectorp fruits))
+      (should (= 2 (length fruits)))
+      (should (equal "red" (cdr (assoc "color" (cdr (assoc "physical" (aref fruits 0)))))))
+      (should (equal "yellow" (cdr (assoc "color" (cdr (assoc "physical" (aref fruits 1))))))))))
+
+(ert-deftest toml-test-error:parse-dotted-key-redefine ()
+  "Test that redefining a dotted key is an error."
+  (should-error (toml:read-from-string "
+a.b = 1
+a.b = 2")
+                :type 'toml-redefine-key-error))
+
+(ert-deftest toml-test-error:parse-dotted-key-extend-non-table ()
+  "Test that extending a non-table value with dotted key is an error."
+  (should-error (toml:read-from-string "
+a.b = 1
+a.b.c = 2")
+                :type 'toml-redefine-key-error))
 
 (ert-deftest toml-test:read-array-table-with-nested-subtable ()
   "Test array of tables with deeply nested sub-tables."

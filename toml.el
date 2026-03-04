@@ -412,9 +412,21 @@ Move point to the end of read string."
   (forward-char)
   (let (elements char-after-read)
     (while (not (char-equal (toml:get-char-at-point) ?}))
-      (let ((key (toml:read-key))
-            (value (toml:read-value)))
-        (push `(,key . ,value) elements))
+      (let* ((key-segments (toml:read-key))
+             (value (toml:read-value)))
+        (if (= 1 (length key-segments))
+            ;; Simple key: traditional (key . value)
+            (push `(,(car key-segments) . ,value) elements)
+          ;; Dotted key: build nested structure
+          (let* ((table-path (butlast key-segments))
+                 (leaf-key (car (last key-segments)))
+                 (nested (toml:make-table-hashes table-path leaf-key value nil)))
+            ;; Merge with existing elements (for cases like x.y=1, x.z=2)
+            (dolist (entry nested)
+              (let ((existing (assoc (car entry) elements)))
+                (if (and existing (toml:alistp (cdr existing)) (toml:alistp (cdr entry)))
+                    (setcdr existing (append (cdr existing) (cdr entry)))
+                  (push entry elements)))))))
       (toml:seek-readable-point)
       (setq char-after-read (toml:get-char-at-point))
       (unless (char-equal char-after-read ?})
@@ -474,23 +486,45 @@ Behavior differences:
       (toml:seek-readable-point))
     (list :type table-type :keys table-keys)))
 
+(defun toml:read-key-segment ()
+  "Read a single key segment at point.
+Returns the key string, or nil if at eob or table header."
+  (condition-case err
+      (cond
+       ((eobp) nil)
+       ((char-equal (toml:get-char-at-point) ?\[) nil)
+       ((char-equal (toml:get-char-at-point) ?\") (toml:read-string))
+       ((char-equal (toml:get-char-at-point) ?\') (toml:read-literal-string))
+       ((toml:search-forward "\\([A-Za-z0-9_-]+\\)")
+        (match-string-no-properties 1))
+       (t (signal 'toml-key-error (list (point)))))
+    (toml-string-error
+     (signal 'toml-key-error (cdr err)))))
+
 (defun toml:read-key ()
+  "Read a key at point, including dotted keys.
+Returns a list of key segments (e.g., (\"name\") or (\"physical\" \"color\")),
+or nil if no key is found."
   (toml:seek-readable-point)
-  (let ((key (condition-case err
-                 (cond
-                  ((eobp) nil)
-                  ;; If we're at a table header, return nil (no key to read)
-                  ((char-equal (toml:get-char-at-point) ?\[) nil)
-                  ((char-equal (toml:get-char-at-point) ?\") (toml:read-string))
-                  ((char-equal (toml:get-char-at-point) ?\') (toml:read-literal-string))
-                  ((toml:search-forward "\\([A-Za-z0-9_-]+\\)")
-                   (match-string-no-properties 1))
-                  (t (signal 'toml-key-error (list (point)))))
-               (toml-string-error
-                (signal 'toml-key-error (cdr err))))))
-    (unless (or (not key) (toml:search-forward " *= *"))
-      (signal 'toml-key-error (list (point))))
-    key))
+  (let ((first-segment (toml:read-key-segment)))
+    (when first-segment
+      (let ((segments (list first-segment)))
+        ;; Read additional dot-separated segments
+        (while (progn
+                 (skip-chars-forward " \t")
+                 (and (not (eobp))
+                      (eq (toml:get-char-at-point) ?.)))
+          (forward-char) ; skip the dot
+          (skip-chars-forward " \t")
+          (let ((seg (toml:read-key-segment)))
+            (unless seg
+              (signal 'toml-key-error (list (point))))
+            (push seg segments)))
+        (setq segments (nreverse segments))
+        ;; Expect " = " after the key
+        (unless (toml:search-forward " *= *")
+          (signal 'toml-key-error (list (point))))
+        segments))))
 
 (defun toml:make-table-hashes (table-keys key value hashes)
   "Add VALUE to HASHES at TABLE-KEYS + KEY path, creating nested tables.
@@ -767,32 +801,42 @@ Example:
             (signal 'toml-redefine-key-error (list (point))))))
 
       ;; Read key-value pair
-      (setq current-key (toml:read-key))
-      (when current-key
-        ;; Check for key redefinition
-        (let ((full-path (if current-array-table
-                             ;; For array tables, we don't check global redefinition
-                             nil
-                           (append current-table (list current-key)))))
-          (when (and full-path (toml:assoc full-path hashes))
-            (signal 'toml-redefine-key-error (list (point)))))
+      (let ((key-segments (toml:read-key)))
+        (when key-segments
+          (let* ((dotted-table (butlast key-segments))
+                 (leaf-key (car (last key-segments)))
+                 (effective-table (append current-table dotted-table)))
+            ;; Check for key redefinition
+            (let ((full-path (if current-array-table
+                                 nil
+                               (append effective-table (list leaf-key)))))
+              (when (and full-path (toml:assoc full-path hashes))
+                (signal 'toml-redefine-key-error (list (point))))
+              ;; Check that intermediate dotted-table paths are not non-table values
+              (when (and full-path dotted-table)
+                (let ((prefix current-table))
+                  (dolist (seg dotted-table)
+                    (setq prefix (append prefix (list seg)))
+                    (let ((existing (toml:assoc prefix hashes)))
+                      (when (and existing (not (toml:alistp (cdr existing))))
+                        (signal 'toml-redefine-key-error (list (point)))))))))
 
-        (setq current-value (toml:read-value))
+            (setq current-value (toml:read-value))
 
-        ;; Add to appropriate structure
-        (if current-array-table
-            ;; Add to array table element
-            (setq hashes (toml:add-to-array-table current-array-table
-                                                  current-array-sub-keys
-                                                  current-key
-                                                  current-value
-                                                  hashes
-                                                  array-table-registry))
-          ;; Add to regular table
-          (setq hashes (toml:make-table-hashes current-table
-                                               current-key
-                                               current-value
-                                               hashes))))
+            ;; Add to appropriate structure
+            (if current-array-table
+                ;; Add to array table element
+                (setq hashes (toml:add-to-array-table current-array-table
+                                                      (append current-array-sub-keys dotted-table)
+                                                      leaf-key
+                                                      current-value
+                                                      hashes
+                                                      array-table-registry))
+              ;; Add to regular table
+              (setq hashes (toml:make-table-hashes effective-table
+                                                   leaf-key
+                                                   current-value
+                                                   hashes))))))
 
       (toml:seek-readable-point))
     hashes))
