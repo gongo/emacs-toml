@@ -469,22 +469,60 @@ Behavior differences:
     (while (and (not (eobp))
                 (or (null table-type) (eq table-type 'single))
                 (char-equal (toml:get-char-at-point) ?\[))
-      (if (toml:search-forward "\\(\\[\\{1,2\\}\\)\\([A-Za-z0-9_-][A-Za-z0-9_\\.-]*\\)\\(\\]\\{1,2\\}\\)")
-          (let* ((brackets-before (match-string-no-properties 1)) ;;  "["  in "[xxx]"
-                 (brackets-after (match-string-no-properties 3))  ;;  "]"  in "[xxx]"
-                 (table-string (match-string-no-properties 2)))   ;; "xxx" in "[xxx]"
-            (when (string-match "\\.\\'" table-string)
-              (signal 'toml-table-error (list (point))))
-            (unless (= (length brackets-before) (length brackets-after))
-              (signal 'toml-table-error (list (point))))
-            (setq table-keys (split-string table-string "\\."))
-            (setq table-type (if (string= brackets-before "[[") 'array 'single))
-            ;; Check for table redefinition if checker is provided
-            (when (and table-history-checker (eq table-type 'single))
-              (funcall table-history-checker table-keys)))
-        (signal 'toml-table-error (list (point))))
+      ;; Determine if this is [key] or [[key]]
+      (forward-char) ;; skip first [
+      (let ((is-array (and (not (eobp))
+                           (char-equal (toml:get-char-at-point) ?\[))))
+        (when is-array (forward-char)) ;; skip second [
+        (skip-chars-forward " \t")
+        ;; Read first key segment
+        (let ((segments (list (toml:read-table-key-segment))))
+          ;; Read remaining dotted segments
+          (let ((continue t))
+            (while continue
+              (skip-chars-forward " \t")
+              (if (and (not (eobp))
+                       (char-equal (toml:get-char-at-point) ?.))
+                  (progn
+                    (forward-char) ;; skip dot
+                    (skip-chars-forward " \t")
+                    (push (toml:read-table-key-segment) segments))
+                (setq continue nil))))
+          (skip-chars-forward " \t")
+          ;; Consume closing bracket(s) and verify match
+          (if is-array
+              (if (and (not (eobp))
+                       (char-equal (toml:get-char-at-point) ?\])
+                       (progn (forward-char) t)
+                       (not (eobp))
+                       (char-equal (toml:get-char-at-point) ?\]))
+                  (forward-char)
+                (signal 'toml-table-error (list (point))))
+            (if (and (not (eobp))
+                     (char-equal (toml:get-char-at-point) ?\]))
+                (forward-char)
+              (signal 'toml-table-error (list (point)))))
+          (setq table-keys (nreverse segments))
+          (setq table-type (if is-array 'array 'single))
+          ;; Check for table redefinition if checker is provided
+          (when (and table-history-checker (eq table-type 'single))
+            (funcall table-history-checker table-keys))))
       (toml:seek-readable-point))
     (list :type table-type :keys table-keys)))
+
+(defun toml:read-table-key-segment ()
+  "Read a single key segment inside a table header.
+Returns the key string, or signals toml-table-error."
+  (condition-case err
+      (cond
+       ((eobp) (signal 'toml-table-error (list (point))))
+       ((char-equal (toml:get-char-at-point) ?\") (toml:read-string))
+       ((char-equal (toml:get-char-at-point) ?\') (toml:read-literal-string))
+       ((toml:search-forward "\\([A-Za-z0-9_-]+\\)")
+        (match-string-no-properties 1))
+       (t (signal 'toml-table-error (list (point)))))
+    (toml-string-error
+     (signal 'toml-table-error (cdr err)))))
 
 (defun toml:read-key-segment ()
   "Read a single key segment at point.

@@ -563,7 +563,85 @@ aiueo"
     [[servers.alpha]]
     [[client]]"
    (should (equal '(:type array :keys ("servers")) (toml:read-table))))
+
+  ;; Quoted keys in table headers
+  (toml-test:buffer-setup
+   "[dog.\"tater.man\"]"
+   (should (equal '(:type single :keys ("dog" "tater.man")) (toml:read-table))))
+
+  (toml-test:buffer-setup
+   "[dog.'tater.man']"
+   (should (equal '(:type single :keys ("dog" "tater.man")) (toml:read-table))))
+
+  (toml-test:buffer-setup
+   "[\"dog\".tater]"
+   (should (equal '(:type single :keys ("dog" "tater")) (toml:read-table))))
+
+  ;; Spaces around dots and brackets with quoted keys
+  (toml-test:buffer-setup
+   "[ dog . \"tater.man\" ]"
+   (should (equal '(:type single :keys ("dog" "tater.man")) (toml:read-table))))
+
+  ;; Array of tables with quoted keys
+  (toml-test:buffer-setup
+   "[[dog.\"tater.man\"]]"
+   (should (equal '(:type array :keys ("dog" "tater.man")) (toml:read-table))))
   )
+
+(ert-deftest toml-test:read-table-quoted-key-integration ()
+  ;; Integration: quoted key in table header with key/value pairs
+  (toml-test:buffer-setup
+   "
+[dog.\"tater.man\"]
+type.name = \"pug\""
+   (should (equal
+            '(("dog" . (("tater.man" . (("type" . (("name" . "pug"))))))))
+            (toml:read))))
+
+  ;; Literal string key in table header
+  (toml-test:buffer-setup
+   "
+[dog.'tater.man']
+type = \"pug\""
+   (should (equal
+            '(("dog" . (("tater.man" . (("type" . "pug"))))))
+            (toml:read))))
+
+  ;; Quoted key at first segment
+  (toml-test:buffer-setup
+   "
+[\"dog\".tater]
+type = \"pug\""
+   (should (equal
+            '(("dog" . (("tater" . (("type" . "pug"))))))
+            (toml:read))))
+
+  ;; Multiple tables with quoted keys
+  (toml-test:buffer-setup
+   "
+[a.\"b.c\"]
+x = 1
+
+[a.\"d.e\"]
+y = 2"
+   (should (equal
+            '(("a"
+	       ("d.e" ("y" . 2))
+               ("b.c" ("x" . 1))))
+            (toml:read))))
+
+  ;; Array of tables with quoted keys
+  (toml-test:buffer-setup
+   "
+[[fruit.\"physical.prop\"]]
+color = \"red\"
+
+[[fruit.\"physical.prop\"]]
+color = \"green\""
+   (should (equal
+            '(("fruit" . (("physical.prop" . [(("color" . "red"))
+                                              (("color" . "green"))]))))
+            (toml:read)))))
 
 (ert-deftest toml-test-error:read-table ()
   (toml-test:buffer-setup
@@ -573,6 +651,11 @@ aiueo"
   ;; end with period "."
   (toml-test:buffer-setup
    "[foo.bar.]"
+   (should-error (toml:read-table) :type 'toml-table-error))
+
+  ;; consecutive dots
+  (toml-test:buffer-setup
+   "[foo..bar]"
    (should-error (toml:read-table) :type 'toml-table-error)))
 
 (ert-deftest toml-test:make-table-hashes ()
