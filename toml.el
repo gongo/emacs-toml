@@ -474,23 +474,45 @@ Behavior differences:
       (toml:seek-readable-point))
     (list :type table-type :keys table-keys)))
 
+(defun toml:read-key-segment ()
+  "Read a single key segment at point.
+Returns the key string, or nil if at eob or table header."
+  (condition-case err
+      (cond
+       ((eobp) nil)
+       ((char-equal (toml:get-char-at-point) ?\[) nil)
+       ((char-equal (toml:get-char-at-point) ?\") (toml:read-string))
+       ((char-equal (toml:get-char-at-point) ?\') (toml:read-literal-string))
+       ((toml:search-forward "\\([A-Za-z0-9_-]+\\)")
+        (match-string-no-properties 1))
+       (t (signal 'toml-key-error (list (point)))))
+    (toml-string-error
+     (signal 'toml-key-error (cdr err)))))
+
 (defun toml:read-key ()
+  "Read a key at point, including dotted keys.
+Returns a list of key segments (e.g., (\"name\") or (\"physical\" \"color\")),
+or nil if no key is found."
   (toml:seek-readable-point)
-  (let ((key (condition-case err
-                 (cond
-                  ((eobp) nil)
-                  ;; If we're at a table header, return nil (no key to read)
-                  ((char-equal (toml:get-char-at-point) ?\[) nil)
-                  ((char-equal (toml:get-char-at-point) ?\") (toml:read-string))
-                  ((char-equal (toml:get-char-at-point) ?\') (toml:read-literal-string))
-                  ((toml:search-forward "\\([A-Za-z0-9_-]+\\)")
-                   (match-string-no-properties 1))
-                  (t (signal 'toml-key-error (list (point)))))
-               (toml-string-error
-                (signal 'toml-key-error (cdr err))))))
-    (unless (or (not key) (toml:search-forward " *= *"))
-      (signal 'toml-key-error (list (point))))
-    key))
+  (let ((first-segment (toml:read-key-segment)))
+    (when first-segment
+      (let ((segments (list first-segment)))
+        ;; Read additional dot-separated segments
+        (while (progn
+                 (skip-chars-forward " \t")
+                 (and (not (eobp))
+                      (eq (toml:get-char-at-point) ?.)))
+          (forward-char) ; skip the dot
+          (skip-chars-forward " \t")
+          (let ((seg (toml:read-key-segment)))
+            (unless seg
+              (signal 'toml-key-error (list (point))))
+            (push seg segments)))
+        (setq segments (nreverse segments))
+        ;; Expect " = " after the key
+        (unless (toml:search-forward " *= *")
+          (signal 'toml-key-error (list (point))))
+        segments))))
 
 (defun toml:make-table-hashes (table-keys key value hashes)
   "Add VALUE to HASHES at TABLE-KEYS + KEY path, creating nested tables.

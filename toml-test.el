@@ -329,83 +329,96 @@ aiueo"
 (ert-deftest toml-test:read-key ()
   (toml-test:buffer-setup
    "a = 3"
-   (should (equal "a" (toml:read-key)))
+   (should (equal '("a") (toml:read-key)))
    (should (eq ?3 (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "biueo = true"
-   (should (equal "biueo" (toml:read-key)))
+   (should (equal '("biueo") (toml:read-key)))
    (should (eq ?t (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "connection_max = 5000"
-   (should (equal "connection_max" (toml:read-key)))
+   (should (equal '("connection_max") (toml:read-key)))
    (should (eq ?5 (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "connection-max = name"
-   (should (equal "connection-max" (toml:read-key)))
+   (should (equal '("connection-max") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "server12 = name"
-   (should (equal "server12" (toml:read-key)))
+   (should (equal '("server12") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "'key' = name"
-   (should (equal "key" (toml:read-key)))
+   (should (equal '("key") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "\"key\" = name"
-   (should (equal "key" (toml:read-key)))
+   (should (equal '("key") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
-
-  ;; (toml-test:buffer-setup
-  ;;  "\"key\\n\" = name"
-  ;;  (should (equal "key\n" (toml:read-key)))
-  ;;  (should (eq ?n (toml:get-char-at-point))))
-
-  ;; (toml-test:buffer-setup
-  ;;  "'key\\n' = name"
-  ;;  (should (equal "key\\n" (toml:read-key)))
-  ;;  (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "'' = name"
-   (should (equal "" (toml:read-key)))
+   (should (equal '("") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "\"\" = name"
-   (should (equal "" (toml:read-key)))
+   (should (equal '("") (toml:read-key)))
    (should (eq ?n (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "1biueo = true"
-   (should (equal "1biueo" (toml:read-key)))
+   (should (equal '("1biueo") (toml:read-key)))
    (should (eq ?t (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "connection_ = 5000"
-   (should (equal "connection_" (toml:read-key)))
+   (should (equal '("connection_") (toml:read-key)))
    (should (eq ?5 (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "1234 = 42"
-   (should (equal "1234" (toml:read-key)))
+   (should (equal '("1234") (toml:read-key)))
    (should (eq ?4 (toml:get-char-at-point))))
 
   (toml-test:buffer-setup
    "_ = 1"
-   (should (equal "_" (toml:read-key)))
+   (should (equal '("_") (toml:read-key)))
    (should (eq ?1 (toml:get-char-at-point))))
+
+  ;; Dotted keys
+  (toml-test:buffer-setup
+   "physical.color = \"orange\""
+   (should (equal '("physical" "color") (toml:read-key)))
+   (should (eq ?\" (toml:get-char-at-point))))
+
+  (toml-test:buffer-setup
+   "a.b.c = 1"
+   (should (equal '("a" "b" "c") (toml:read-key)))
+   (should (eq ?1 (toml:get-char-at-point))))
+
+  ;; Dotted key with spaces around dot
+  (toml-test:buffer-setup
+   "fruit . color = \"red\""
+   (should (equal '("fruit" "color") (toml:read-key)))
+   (should (eq ?\" (toml:get-char-at-point))))
+
+  ;; Dotted key with quoted segments
+  (toml-test:buffer-setup
+   "site.\"google.com\" = true"
+   (should (equal '("site" "google.com") (toml:read-key)))
+   (should (eq ?t (toml:get-char-at-point))))
   )
 
 
 (ert-deftest toml-test-error:read-key ()
-  ;; no key
+  ;; no key - "=" doesn't match any key pattern, so read-key-segment signals error
   (toml-test:buffer-setup
    " = 3"
    (should-error (toml:read-key) :type 'toml-key-error))
