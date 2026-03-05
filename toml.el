@@ -55,6 +55,8 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
   (let ((table
          '((?t  . toml:read-boolean)
            (?f  . toml:read-boolean)
+           (?i  . toml:read-special-float)
+           (?n  . toml:read-special-float)
            (?\[ . toml:read-array)
            (?{  . toml:read-inline-table)
            (?\" . toml:read-string)
@@ -75,6 +77,18 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 \\(?:\\.\\([0-9]+\\)\\)?\
 \\(Z\\|[+-][0-9]\\{2\\}:[0-9]\\{2\\}\\)"
   "Regular expression for RFC 3339 datetime with timezone and fractional seconds.")
+
+(defconst toml->regexp-hex
+  "\\(0x[0-9a-fA-F]+\\(?:_[0-9a-fA-F]+\\)*\\)"
+  "Regular expression for hexadecimal integer literals.")
+
+(defconst toml->regexp-oct
+  "\\(0o[0-7]+\\(?:_[0-7]+\\)*\\)"
+  "Regular expression for octal integer literals.")
+
+(defconst toml->regexp-bin
+  "\\(0b[01]+\\(?:_[01]+\\)*\\)"
+  "Regular expression for binary integer literals.")
 
 (defconst toml->regexp-numeric
   "\\([+-]?[0-9][_0-9]*[.0-9eE+_-]*\\)"
@@ -365,23 +379,62 @@ Move point to the end of read datetime string."
 (defun toml:read-numeric ()
   "Read numeric (integer or float) at point.  Return numeric.
 Move point to the end of read numeric string."
-  (unless (toml:search-forward toml->regexp-numeric)
+  (cond
+   ;; Reject uppercase prefixes: 0X, 0O, 0B
+   ((let ((case-fold-search nil))
+      (looking-at "0[XOB]"))
     (signal 'toml-numeric-error (list (point))))
-  (let ((numeric-str (match-string-no-properties 0)))
-    ;; Two-stage validation:
-    ;; 1. toml->regexp-numeric (loose) - greedily captures all numeric-like
-    ;;    characters to ensure invalid trailing chars (e.g., "1.1.1") are
-    ;;    included in the match rather than left unparsed.
-    ;; 2. toml->regexp-numeric-strict - validates the captured string has
-    ;;    correct format (e.g., rejects "1e", "1.", "1.1.1").
-    (unless (string-match-p toml->regexp-numeric-strict numeric-str)
-      (signal 'toml-numeric-error (list (point))))
-    (string-to-number (replace-regexp-in-string "_" "" numeric-str))))
+   ;; Reject underscore after prefix: 0x_, 0o_, 0b_
+   ((looking-at "0[xob]_")
+    (signal 'toml-numeric-error (list (point))))
+   ;; Hexadecimal: 0xDEADBEEF
+   ((toml:search-forward toml->regexp-hex)
+    (let ((s (replace-regexp-in-string "_" "" (match-string-no-properties 1))))
+      (string-to-number (substring s 2) 16)))
+   ;; Octal: 0o755
+   ((toml:search-forward toml->regexp-oct)
+    (let ((s (replace-regexp-in-string "_" "" (match-string-no-properties 1))))
+      (string-to-number (substring s 2) 8)))
+   ;; Binary: 0b11010110
+   ((toml:search-forward toml->regexp-bin)
+    (let ((s (replace-regexp-in-string "_" "" (match-string-no-properties 1))))
+      (string-to-number (substring s 2) 2)))
+   ;; Regular decimal numeric
+   ((toml:search-forward toml->regexp-numeric)
+    (let ((numeric-str (match-string-no-properties 0)))
+      ;; Two-stage validation:
+      ;; 1. toml->regexp-numeric (loose) - greedily captures all numeric-like
+      ;;    characters to ensure invalid trailing chars (e.g., "1.1.1") are
+      ;;    included in the match rather than left unparsed.
+      ;; 2. toml->regexp-numeric-strict - validates the captured string has
+      ;;    correct format (e.g., rejects "1e", "1.", "1.1.1").
+      (unless (string-match-p toml->regexp-numeric-strict numeric-str)
+        (signal 'toml-numeric-error (list (point))))
+      (string-to-number (replace-regexp-in-string "_" "" numeric-str))))
+   (t
+    (signal 'toml-numeric-error (list (point))))))
+
+(defun toml:read-special-float ()
+  "Read special float value (inf or nan) at point.
+Return the corresponding Emacs Lisp float value."
+  (cond
+   ((toml:search-forward "inf") 1.0e+INF)
+   ((toml:search-forward "nan") 0.0e+NaN)
+   (t (signal 'toml-numeric-error (list (point))))))
 
 (defun toml:read-start-with-number ()
   "Read string that start with number at point.
 Move point to the end of read string."
   (cond
+   ;; +inf, -inf, +nan, -nan
+   ((looking-at "[+-]\\(inf\\|nan\\)")
+    (let ((sign (toml:read-char t)))
+      (let ((val (toml:read-special-float)))
+        (if (eq sign ?-)
+            (- val)
+          val))))
+   ;; 0x, 0o, 0b prefixed integers - skip datetime check
+   ((looking-at "0[xob]") (toml:read-numeric))
    ((looking-at toml->regexp-datetime) (toml:read-datetime))
    ((looking-at toml->regexp-numeric) (toml:read-numeric))
    (t

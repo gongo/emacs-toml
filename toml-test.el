@@ -318,6 +318,51 @@ aiueo"
      (should (equal 1e11 numeric))
      (should (floatp numeric)))))
 
+(ert-deftest toml-test:read-numeric-hex ()
+  (dolist (test '(("0xDEADBEEF" . 3735928559)
+                  ("0xdeadbeef" . 3735928559)
+                  ("0xdead_beef" . 3735928559)
+                  ("0x0" . 0)
+                  ("0xff" . 255)
+                  ("0x00ff" . 255)))
+    (toml-test:buffer-setup
+     (car test)
+     (let ((result (toml:read-numeric)))
+       (should (equal (cdr test) result))
+       (should (integerp result))))))
+
+(ert-deftest toml-test:read-numeric-oct ()
+  (dolist (test '(("0o755" . 493)
+                  ("0o01234567" . 342391)
+                  ("0o0" . 0)))
+    (toml-test:buffer-setup
+     (car test)
+     (let ((result (toml:read-numeric)))
+       (should (equal (cdr test) result))
+       (should (integerp result))))))
+
+(ert-deftest toml-test:read-numeric-bin ()
+  (dolist (test '(("0b11010110" . 214)
+                  ("0b0" . 0)
+                  ("0b1111_0000" . 240)))
+    (toml-test:buffer-setup
+     (car test)
+     (let ((result (toml:read-numeric)))
+       (should (equal (cdr test) result))
+       (should (integerp result))))))
+
+(ert-deftest toml-test-error:read-numeric-prefixed ()
+  ;; Uppercase prefixes are invalid
+  (dolist (str '("0X1" "0O7" "0B1"))
+    (toml-test:buffer-setup
+     str
+     (should-error (toml:read-numeric) :type 'toml-numeric-error)))
+  ;; Underscore after prefix is invalid (caught by regexp not matching)
+  (dolist (str '("0x_deadbeef" "0o_7" "0b_1"))
+    (toml-test:buffer-setup
+     str
+     (should-error (toml:read-numeric) :type 'toml-numeric-error))))
+
 (ert-deftest toml-test-error:read-numeric ()
   (dolist (str '("" "- 1.1" " 1.1" ".1" "1.1.1" "1.1.1.1"
                  "1e" "1e+" "1e-" "1E+" "1." "1.e5"
@@ -1214,6 +1259,64 @@ line2'''"
   "Test multiline literal strings with CRLF line endings."
   (let ((parsed (toml:read-from-string "key = '''\r\nHello\r\nWorld'''")))
     (should (equal "Hello\nWorld" (cdr (assoc "key" parsed))))))
+
+;; Special float tests (inf, nan)
+
+(ert-deftest toml-test:read-special-float ()
+  "Test parsing of special float values inf and nan."
+  (toml-test:buffer-setup
+   "inf"
+   (should (equal 1.0e+INF (toml:read-special-float))))
+
+  (toml-test:buffer-setup
+   "nan"
+   (let ((result (toml:read-special-float)))
+     (should (isnan result)))))
+
+(ert-deftest toml-test:parse-special-float-values ()
+  "Test special float values in full TOML parsing."
+  (let ((parsed (toml:read-from-string "
+val_inf = inf
+val_pinf = +inf
+val_ninf = -inf
+val_nan = nan
+val_pnan = +nan
+val_nnan = -nan")))
+    (should (equal 1.0e+INF (cdr (assoc "val_inf" parsed))))
+    (should (equal 1.0e+INF (cdr (assoc "val_pinf" parsed))))
+    (should (equal -1.0e+INF (cdr (assoc "val_ninf" parsed))))
+    (should (isnan (cdr (assoc "val_nan" parsed))))
+    (should (isnan (cdr (assoc "val_pnan" parsed))))
+    (should (isnan (cdr (assoc "val_nnan" parsed))))))
+
+(ert-deftest toml-test-error:read-special-float ()
+  "Test that invalid special float values are rejected."
+  (dolist (input '("Inf" "INF" "Infinity" "infinity" "+Infinity"
+                   "NaN" "NAN"))
+    (toml-test:buffer-setup
+     (concat "x = " input)
+     (should-error (toml:read) :type 'toml-error))))
+
+;; Hex/Oct/Bin integration tests
+
+(ert-deftest toml-test:parse-prefixed-integers ()
+  "Test hex, oct, bin integers in full TOML parsing."
+  (let ((parsed (toml:read-from-string "
+hex1 = 0xDEADBEEF
+hex2 = 0xdead_beef
+oct1 = 0o755
+bin1 = 0b11010110")))
+    (should (equal 3735928559 (cdr (assoc "hex1" parsed))))
+    (should (equal 3735928559 (cdr (assoc "hex2" parsed))))
+    (should (equal 493 (cdr (assoc "oct1" parsed))))
+    (should (equal 214 (cdr (assoc "bin1" parsed))))))
+
+(ert-deftest toml-test-error:parse-signed-prefixed-integers ()
+  "Test that signed prefixed integers are rejected."
+  (should-error (toml:read-from-string "x = +0xff")
+                :type 'toml-error)
+  (should-error (toml:read-from-string "x = -0xff")
+                :type 'toml-error))
 
 (ert-deftest toml-test:parse-multiline-strings ()
   (toml-test:buffer-setup
