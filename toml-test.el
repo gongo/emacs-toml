@@ -268,6 +268,32 @@ aiueo"
      (should (equal 1 (cdr (assoc 'month dt))))
      (should (equal 1 (cdr (assoc 'day dt)))))))
 
+(ert-deftest toml-test:read-local-time ()
+  (toml-test:buffer-setup
+   "07:32:00"
+   (let ((dt (toml:read-local-time)))
+     (should (equal 7 (cdr (assoc 'hour dt))))
+     (should (equal 32 (cdr (assoc 'minute dt))))
+     (should (equal 0 (cdr (assoc 'second dt))))
+     (should (null (cdr (assoc 'fraction dt))))
+     (should (null (assoc 'year dt))))))
+
+(ert-deftest toml-test:read-local-time-end-of-day ()
+  (toml-test:buffer-setup
+   "23:59:59"
+   (let ((dt (toml:read-local-time)))
+     (should (equal 23 (cdr (assoc 'hour dt))))
+     (should (equal 59 (cdr (assoc 'minute dt))))
+     (should (equal 59 (cdr (assoc 'second dt)))))))
+
+(ert-deftest toml-test:read-local-time-with-fraction ()
+  (toml-test:buffer-setup
+   "07:32:00.999"
+   (let ((dt (toml:read-local-time)))
+     (should (equal 7 (cdr (assoc 'hour dt))))
+     (should (floatp (cdr (assoc 'fraction dt))))
+     (should (equal 0.999 (cdr (assoc 'fraction dt)))))))
+
 (ert-deftest toml-test-error:read-datetime ()
   (dolist (str '("1979-35-27T07:32:00Z" " 1979-05-27T07:32:00Z"))
     (toml-test:buffer-setup
