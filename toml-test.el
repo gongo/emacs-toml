@@ -251,8 +251,25 @@ aiueo"
      (should (equal 7 (cdr (assoc 'hour dt))))
      (should (null (assoc 'timezone dt))))))
 
+(ert-deftest toml-test:read-local-date ()
+  (toml-test:buffer-setup
+   "1979-05-27"
+   (let ((dt (toml:read-local-date)))
+     (should (equal 1979 (cdr (assoc 'year dt))))
+     (should (equal 5 (cdr (assoc 'month dt))))
+     (should (equal 27 (cdr (assoc 'day dt))))
+     (should (null (assoc 'hour dt)))
+     (should (null (assoc 'timezone dt)))))
+
+  (toml-test:buffer-setup
+   "2000-01-01"
+   (let ((dt (toml:read-local-date)))
+     (should (equal 2000 (cdr (assoc 'year dt))))
+     (should (equal 1 (cdr (assoc 'month dt))))
+     (should (equal 1 (cdr (assoc 'day dt)))))))
+
 (ert-deftest toml-test-error:read-datetime ()
-  (dolist (str '("1979-05-27" "1979-35-27T07:32:00Z" " 1979-05-27T07:32:00Z"))
+  (dolist (str '("1979-35-27T07:32:00Z" " 1979-05-27T07:32:00Z"))
     (toml-test:buffer-setup
      str
      (should-error (toml:read-datetime) :type 'toml-datetime-error))))
