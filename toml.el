@@ -78,6 +78,17 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 \\(Z\\|[+-][0-9]\\{2\\}:[0-9]\\{2\\}\\)"
   "Regular expression for RFC 3339 datetime with timezone and fractional seconds.")
 
+(defconst toml->regexp-local-datetime
+  "\
+\\([0-9]\\{4\\}\\)-\
+\\(0[1-9]\\|1[0-2]\\)-\
+\\(0[1-9]\\|[1-2][0-9]\\|3[0-1]\\)[Tt ]\
+\\([0-1][0-9]\\|2[0-3]\\):\
+\\([0-5][0-9]\\):\
+\\([0-5][0-9]\\)\
+\\(?:\\.\\([0-9]+\\)\\)?"
+  "Regular expression for local date-time (no timezone).")
+
 (defconst toml->regexp-hex
   "\\(0x[0-9a-fA-F]+\\(?:_[0-9a-fA-F]+\\)*\\)"
   "Regular expression for hexadecimal integer literals.")
@@ -343,6 +354,16 @@ No escape processing. Trims immediate newline after opening delimiter."
       (forward-char)
       (apply #'concat (nreverse characters)))))
 
+(defun toml:validate-date (year month day)
+  "Validate that YEAR-MONTH-DAY is a valid date.
+Signal `toml-datetime-error' if the day exceeds the month's maximum."
+  (let ((max-day (pcase month
+                   (2 (if (date-leap-year-p year) 29 28))
+                   ((or 4 6 9 11) 30)
+                   (_ 31))))
+    (when (> day max-day)
+      (signal 'toml-datetime-error (list (point))))))
+
 (defun toml:read-boolean ()
   "Read boolean at point.  Return t or nil.
 Move point to the end of read boolean string."
@@ -367,6 +388,7 @@ Move point to the end of read datetime string."
         (second   (string-to-number (match-string-no-properties 6)))
         (fraction (match-string-no-properties 7))  ; optional
         (timezone (match-string-no-properties 8))) ; Z or +HH:MM or -HH:MM
+    (toml:validate-date year month day)
     `((year . ,year)
       (month . ,month)
       (day . ,day)
@@ -375,6 +397,28 @@ Move point to the end of read datetime string."
       (second . ,second)
       (fraction . ,(when fraction (string-to-number (concat "0." fraction))))
       (timezone . ,timezone))))
+
+(defun toml:read-local-datetime ()
+  "Read local date-time (no timezone) at point.
+Return alist with keys: year, month, day, hour, minute, second, fraction.
+Move point to the end of read datetime string."
+  (unless (toml:search-forward toml->regexp-local-datetime)
+    (signal 'toml-datetime-error (list (point))))
+  (let ((year     (string-to-number (match-string-no-properties 1)))
+        (month    (string-to-number (match-string-no-properties 2)))
+        (day      (string-to-number (match-string-no-properties 3)))
+        (hour     (string-to-number (match-string-no-properties 4)))
+        (minute   (string-to-number (match-string-no-properties 5)))
+        (second   (string-to-number (match-string-no-properties 6)))
+        (fraction (match-string-no-properties 7)))
+    (toml:validate-date year month day)
+    `((year . ,year)
+      (month . ,month)
+      (day . ,day)
+      (hour . ,hour)
+      (minute . ,minute)
+      (second . ,second)
+      (fraction . ,(when fraction (string-to-number (concat "0." fraction)))))))
 
 (defun toml:read-numeric ()
   "Read numeric (integer or float) at point.  Return numeric.
@@ -436,6 +480,7 @@ Move point to the end of read string."
    ;; 0x, 0o, 0b prefixed integers - skip datetime check
    ((looking-at "0[xob]") (toml:read-numeric))
    ((looking-at toml->regexp-datetime) (toml:read-datetime))
+   ((looking-at toml->regexp-local-datetime) (toml:read-local-datetime))
    ((looking-at toml->regexp-numeric) (toml:read-numeric))
    (t
     (signal 'toml-start-with-number-error (list (point))))))
