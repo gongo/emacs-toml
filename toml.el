@@ -354,6 +354,16 @@ No escape processing. Trims immediate newline after opening delimiter."
       (forward-char)
       (apply #'concat (nreverse characters)))))
 
+(defun toml:validate-date (year month day)
+  "Validate that YEAR-MONTH-DAY is a valid date.
+Signal `toml-datetime-error' if the day exceeds the month's maximum."
+  (let ((max-day (pcase month
+                   (2 (if (date-leap-year-p year) 29 28))
+                   ((or 4 6 9 11) 30)
+                   (_ 31))))
+    (when (> day max-day)
+      (signal 'toml-datetime-error (list (point))))))
+
 (defun toml:read-boolean ()
   "Read boolean at point.  Return t or nil.
 Move point to the end of read boolean string."
@@ -378,6 +388,7 @@ Move point to the end of read datetime string."
         (second   (string-to-number (match-string-no-properties 6)))
         (fraction (match-string-no-properties 7))  ; optional
         (timezone (match-string-no-properties 8))) ; Z or +HH:MM or -HH:MM
+    (toml:validate-date year month day)
     `((year . ,year)
       (month . ,month)
       (day . ,day)
@@ -400,6 +411,7 @@ Move point to the end of read datetime string."
         (minute   (string-to-number (match-string-no-properties 5)))
         (second   (string-to-number (match-string-no-properties 6)))
         (fraction (match-string-no-properties 7)))
+    (toml:validate-date year month day)
     `((year . ,year)
       (month . ,month)
       (day . ,day)
