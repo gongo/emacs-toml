@@ -46,6 +46,59 @@ The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
    ;; Vector -> array
    ((vectorp value)
     (mapcar #'toml-test-official:value-to-tagged (append value nil)))
+   ;; Datetime alist with timezone -> offset-date-time
+   ((and (listp value) (assoc 'year value) (assoc 'hour value) (assoc 'timezone value))
+    (let ((year     (cdr (assoc 'year value)))
+          (month    (cdr (assoc 'month value)))
+          (day      (cdr (assoc 'day value)))
+          (hour     (cdr (assoc 'hour value)))
+          (minute   (cdr (assoc 'minute value)))
+          (second   (cdr (assoc 'second value)))
+          (fraction (cdr (assoc 'fraction value)))
+          (timezone (cdr (assoc 'timezone value))))
+      `(("type" . "datetime")
+        ("value" . ,(concat (format "%04d-%02d-%02dT%02d:%02d:%02d"
+                                    year month day hour minute second)
+                            (when fraction
+                              (replace-regexp-in-string
+                               "0+\\'" ""
+                               (format ".%s" (substring (format "%.9f" fraction) 2))))
+                            timezone)))))
+   ;; Datetime alist without timezone -> local-date-time
+   ((and (listp value) (assoc 'year value) (assoc 'hour value))
+    (let ((year     (cdr (assoc 'year value)))
+          (month    (cdr (assoc 'month value)))
+          (day      (cdr (assoc 'day value)))
+          (hour     (cdr (assoc 'hour value)))
+          (minute   (cdr (assoc 'minute value)))
+          (second   (cdr (assoc 'second value)))
+          (fraction (cdr (assoc 'fraction value))))
+      `(("type" . "datetime-local")
+        ("value" . ,(concat (format "%04d-%02d-%02dT%02d:%02d:%02d"
+                                    year month day hour minute second)
+                            (when fraction
+                              (replace-regexp-in-string
+                               "0+\\'" ""
+                               (format ".%s" (substring (format "%.9f" fraction) 2)))))))))
+   ;; Date-only alist -> local-date
+   ((and (listp value) (assoc 'year value) (not (assoc 'hour value)))
+    (let ((year  (cdr (assoc 'year value)))
+          (month (cdr (assoc 'month value)))
+          (day   (cdr (assoc 'day value))))
+      `(("type" . "date-local")
+        ("value" . ,(format "%04d-%02d-%02d" year month day)))))
+   ;; Time-only alist -> local-time
+   ((and (listp value) (assoc 'hour value) (not (assoc 'year value)))
+    (let ((hour     (cdr (assoc 'hour value)))
+          (minute   (cdr (assoc 'minute value)))
+          (second   (cdr (assoc 'second value)))
+          (fraction (cdr (assoc 'fraction value))))
+      `(("type" . "time-local")
+        ("value" . ,(concat (format "%02d:%02d:%02d" hour minute second)
+                            (when fraction
+                              (replace-regexp-in-string
+                               "0+\\'" ""
+                               (format ".%s" (substring (format "%.9f" fraction) 2)))))))))
    ;; Alist (table) -> recurse
    ((and (listp value) (consp (car value)))
     (toml-test-official:alist-to-tagged value))
@@ -58,17 +111,6 @@ The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
    ;; String
    ((stringp value)
     `(("type" . "string") ("value" . ,value)))
-   ;; Datetime list (seconds minutes hour day month year)
-   ((and (listp value) (= (length value) 6) (numberp (car value)))
-    (let ((seconds (nth 0 value))
-          (minutes (nth 1 value))
-          (hour (nth 2 value))
-          (day (nth 3 value))
-          (month (nth 4 value))
-          (year (nth 5 value)))
-      `(("type" . "datetime")
-        ("value" . ,(format "%04d-%02d-%02dT%02d:%02d:%02dZ"
-                            year month day hour minutes seconds)))))
    ;; Fallback
    (t value)))
 
