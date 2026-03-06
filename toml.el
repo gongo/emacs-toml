@@ -550,6 +550,19 @@ Move point to the end of read string."
     (forward-char)
     (apply #'vector (nreverse elements-list))))
 
+(defun toml:merge-alists (base new)
+  "Recursively merge alist NEW into alist BASE.
+For keys present in both, if both values are alists, merge recursively.
+Otherwise the NEW value takes precedence."
+  (dolist (entry new)
+    (let* ((key (car entry))
+           (val (cdr entry))
+           (existing (assoc key base)))
+      (if (and existing (toml:alistp (cdr existing)) (toml:alistp val))
+          (setcdr existing (toml:merge-alists (cdr existing) val))
+        (push entry base))))
+  base)
+
 (defun toml:read-inline-table ()
   (unless (eq ?{ (toml:get-char-at-point))
     (signal 'toml-inline-table-error (list (point))))
@@ -569,7 +582,7 @@ Move point to the end of read string."
             (dolist (entry nested)
               (let ((existing (assoc (car entry) elements)))
                 (if (and existing (toml:alistp (cdr existing)) (toml:alistp (cdr entry)))
-                    (setcdr existing (append (cdr existing) (cdr entry)))
+                    (setcdr existing (toml:merge-alists (cdr existing) (cdr entry)))
                   (push entry elements)))))))
       (toml:seek-readable-point)
       (setq char-after-read (toml:get-char-at-point))
