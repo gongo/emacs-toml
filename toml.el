@@ -89,6 +89,13 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 \\(?:\\.\\([0-9]+\\)\\)?"
   "Regular expression for local date-time (no timezone).")
 
+(defconst toml->regexp-local-date
+  "\
+\\([0-9]\\{4\\}\\)-\
+\\(0[1-9]\\|1[0-2]\\)-\
+\\(0[1-9]\\|[1-2][0-9]\\|3[0-1]\\)"
+  "Regular expression for local date (date only, no time).")
+
 (defconst toml->regexp-hex
   "\\(0x[0-9a-fA-F]+\\(?:_[0-9a-fA-F]+\\)*\\)"
   "Regular expression for hexadecimal integer literals.")
@@ -420,6 +427,20 @@ Move point to the end of read datetime string."
       (second . ,second)
       (fraction . ,(when fraction (string-to-number (concat "0." fraction)))))))
 
+(defun toml:read-local-date ()
+  "Read local date at point.
+Return alist with keys: year, month, day.
+Move point to the end of read date string."
+  (unless (toml:search-forward toml->regexp-local-date)
+    (signal 'toml-datetime-error (list (point))))
+  (let ((year  (string-to-number (match-string-no-properties 1)))
+        (month (string-to-number (match-string-no-properties 2)))
+        (day   (string-to-number (match-string-no-properties 3))))
+    (toml:validate-date year month day)
+    `((year . ,year)
+      (month . ,month)
+      (day . ,day))))
+
 (defun toml:read-numeric ()
   "Read numeric (integer or float) at point.  Return numeric.
 Move point to the end of read numeric string."
@@ -481,6 +502,7 @@ Move point to the end of read string."
    ((looking-at "0[xob]") (toml:read-numeric))
    ((looking-at toml->regexp-datetime) (toml:read-datetime))
    ((looking-at toml->regexp-local-datetime) (toml:read-local-datetime))
+   ((looking-at toml->regexp-local-date) (toml:read-local-date))
    ((looking-at toml->regexp-numeric) (toml:read-numeric))
    (t
     (signal 'toml-start-with-number-error (list (point))))))
