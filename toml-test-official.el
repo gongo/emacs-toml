@@ -136,10 +136,10 @@ The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
 (defun toml-test-official:compare-values (expected actual path)
   "Compare EXPECTED and ACTUAL values, reporting differences at PATH."
   (cond
-   ;; Both are alists (tables)
+   ;; Both are alists (tables) — car of each element must be a string key
    ((and (listp expected) (listp actual)
-         (or (null expected) (consp (car expected)))
-         (or (null actual) (consp (car actual))))
+         (or (null expected) (and (consp (car expected)) (stringp (caar expected))))
+         (or (null actual) (and (consp (car actual)) (stringp (caar actual)))))
     (let ((all-keys (delete-dups (append (mapcar #'car expected)
                                           (mapcar #'car actual)))))
       (cl-block nil

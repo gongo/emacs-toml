@@ -1198,6 +1198,14 @@ physical.shape = \"round\"")))
       (should (equal 1 (cdr (assoc "y" (cdr (assoc "x" point))))))
       (should (equal 2 (cdr (assoc "z" (cdr (assoc "x" point)))))))))
 
+(ert-deftest toml-test:parse-deep-dotted-key-in-inline-table ()
+  "Test deeply nested dotted keys with shared prefix in inline table."
+  (let ((parsed (toml:read-from-string "t = { a.b.c = 1, a.b.d = 2 }")))
+    (let* ((tbl (cdr (assoc "t" parsed)))
+           (b (cdr (assoc "b" (cdr (assoc "a" tbl))))))
+      (should (equal 1 (cdr (assoc "c" b))))
+      (should (equal 2 (cdr (assoc "d" b)))))))
+
 (ert-deftest toml-test:parse-dotted-key-in-array-of-tables ()
   "Test dotted key inside array of tables."
   (let ((parsed (toml:read-from-string "
