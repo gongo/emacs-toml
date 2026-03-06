@@ -210,6 +210,37 @@ aiueo"
      (should (equal 0 (cdr (assoc 'hour dt))))
      (should (equal "-07:00" (cdr (assoc 'timezone dt)))))))
 
+(ert-deftest toml-test:read-local-datetime ()
+  (toml-test:buffer-setup
+   "1979-05-27T07:32:00"
+   (let ((dt (toml:read-local-datetime)))
+     (should (equal 1979 (cdr (assoc 'year dt))))
+     (should (equal 5 (cdr (assoc 'month dt))))
+     (should (equal 27 (cdr (assoc 'day dt))))
+     (should (equal 7 (cdr (assoc 'hour dt))))
+     (should (equal 32 (cdr (assoc 'minute dt))))
+     (should (equal 0 (cdr (assoc 'second dt))))
+     (should (null (cdr (assoc 'fraction dt))))
+     (should (null (assoc 'timezone dt))))))
+
+(ert-deftest toml-test:read-local-datetime-with-fraction ()
+  (toml-test:buffer-setup
+   "1979-05-27T07:32:00.999"
+   (let ((dt (toml:read-local-datetime)))
+     (should (equal 1979 (cdr (assoc 'year dt))))
+     (should (equal 7 (cdr (assoc 'hour dt))))
+     (should (floatp (cdr (assoc 'fraction dt))))
+     (should (equal 0.999 (cdr (assoc 'fraction dt))))
+     (should (null (assoc 'timezone dt))))))
+
+(ert-deftest toml-test:read-local-datetime-space-delimiter ()
+  (toml-test:buffer-setup
+   "1979-05-27 07:32:00"
+   (let ((dt (toml:read-local-datetime)))
+     (should (equal 1979 (cdr (assoc 'year dt))))
+     (should (equal 7 (cdr (assoc 'hour dt))))
+     (should (null (assoc 'timezone dt))))))
+
 (ert-deftest toml-test-error:read-datetime ()
   (dolist (str '("1979-05-27" "1979-35-27T07:32:00Z" " 1979-05-27T07:32:00Z"))
     (toml-test:buffer-setup
