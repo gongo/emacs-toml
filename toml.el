@@ -289,6 +289,13 @@ Move point to the end of read characters."
         (char-to-string code-point)))
      (t (signal 'toml-string-unicode-escape-error (list (point)))))))
 
+(defun toml:control-char-p (char)
+  "Return non-nil if CHAR is a control character forbidden in TOML strings.
+Control characters are U+0000 to U+001F (except TAB U+0009) and U+007F."
+  (or (and (>= char #x00) (<= char #x08))
+      (and (>= char #x0A) (<= char #x1F))
+      (= char #x7F)))
+
 (defun toml:read-multiline-basic-string ()
   "Read multiline basic string (enclosed in \"\"\") at point.
 Handles escape sequences, line-ending backslash continuation,
@@ -308,6 +315,10 @@ and trims immediate newline after opening delimiter."
         (goto-char (match-end 0)))
        (t
         (let ((char (toml:get-char-at-point)))
+          (when (and (toml:control-char-p char)
+                     (not (eq char ?\n))
+                     (not (eq char ?\r)))
+            (signal 'toml-string-error (list (point))))
           ;; Regular escape sequence or regular character
           (if (eq char ?\\)
               (push (toml:read-escaped-char) characters)
@@ -330,6 +341,8 @@ Move point to the end of read strings."
         (when (toml:end-of-line-p)
           (signal 'toml-string-error (list (point))))
         (let ((char (toml:get-char-at-point)))
+          (when (toml:control-char-p char)
+            (signal 'toml-string-error (list (point))))
           (if (eq char ?\\)
               (push (toml:read-escaped-char) characters)
             (push (toml:read-char) characters))))
@@ -348,6 +361,11 @@ No escape processing. Trims immediate newline after opening delimiter."
     (while (not (looking-at "'''"))
       (when (eobp)
         (signal 'toml-string-error (list (point))))
+      (let ((char (toml:get-char-at-point)))
+        (when (and (toml:control-char-p char)
+                   (not (eq char ?\n))
+                   (not (eq char ?\r)))
+          (signal 'toml-string-error (list (point)))))
       (push (toml:read-char) characters))
     ;; Skip the closing '''
     (forward-char 3)
@@ -365,6 +383,9 @@ No escape processing. Trims immediate newline after opening delimiter."
       (while (not (eq (toml:get-char-at-point) ?\'))
         (when (toml:end-of-line-p)
           (signal 'toml-string-error (list (point))))
+        (let ((char (toml:get-char-at-point)))
+          (when (toml:control-char-p char)
+            (signal 'toml-string-error (list (point)))))
         (push (toml:read-char) characters))
       (forward-char)
       (apply #'concat (nreverse characters)))))
