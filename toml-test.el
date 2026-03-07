@@ -116,6 +116,42 @@ aiueo"
      str
      (should-error (toml:read-string) :type 'toml-string-error))))
 
+(ert-deftest toml-test:read-string-control-char ()
+  (dolist (test '((#x09 . "\t") ;; U+0009 (TAB)
+                  (#x20 . " ") ;; U+0020 (SPACE)
+		  (#x7E . "~") ;; U+007E (TILDE)
+                  ))
+    (toml-test:buffer-setup
+     (format "\"%c\"" (car test))
+     (let ((result (toml:read-string)))
+       (should (equal (cdr test) result))))
+
+    (toml-test:buffer-setup
+     (format "'%c'" (car test))
+     (let ((result (toml:read-literal-string)))
+       (should (equal (cdr test) result))))
+    ))
+
+(ert-deftest toml-test-error:read-string-control-char ()
+  "Test that control characters are rejected in basic strings."
+  (dolist (char '(#x00 ;; U+0000 (null)
+                  #x1F ;; U+001F (last C0 control char)
+		  #x7F ;; U+007F (DEL)
+                  ))
+    (toml-test:buffer-setup
+     (format "\"%c\"" char)
+     (should-error (toml:read-string) :type 'toml-string-error))))
+
+(ert-deftest toml-test-error:read-literal-string-control-char ()
+  "Test that control characters are rejected in literal strings."
+  (dolist (char '(#x00 ;; U+0000 (null)
+                  #x1F ;; U+001F (last C0 control char)
+		  #x7F ;; U+007F (DEL)
+                  ))
+    (toml-test:buffer-setup
+     (format "'%c'" char)
+     (should-error (toml:read-literal-string) :type 'toml-string-error))))
+
 (ert-deftest toml-test:read-boolean ()
   (toml-test:buffer-setup
    "true"
