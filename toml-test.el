@@ -647,6 +647,14 @@ aiueo"
       2,
     ]"
    (should (equal [1 2] (toml:read-array))))
+
+  (toml-test:buffer-setup
+   "[1, \"a\", 2.0]"
+   (should (equal [1 "a" 2.0] (toml:read-array))))
+
+  (toml-test:buffer-setup
+   "[1, 0.2]"
+   (should (equal [1 0.2] (toml:read-array))))
   )
 
 (ert-deftest toml-test-error:read-array ()
@@ -654,10 +662,6 @@ aiueo"
    "[1 2 3]"
    (should-error (toml:read-array) :type 'toml-array-error))
 
-  ;; FIXME: Data types may not be mixed
-  ;; (toml-test:buffer-setup
-  ;;  "[1, 0.2]"
-  ;;  (should-error (toml:read-array) :type 'toml-array-error))
   )
 
 (ert-deftest toml-test:read-inline-table ()
