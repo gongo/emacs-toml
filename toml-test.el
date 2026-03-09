@@ -152,6 +152,22 @@ aiueo"
      (format "'%c'" char)
      (should-error (toml:read-literal-string) :type 'toml-string-error))))
 
+(ert-deftest toml-test-error:read-comment ()
+  "Test that control characters are rejected in comments."
+  (dolist (char '(#x00 ;; U+0000 (null)
+                  #x1F ;; U+001F (last C0 control char)
+                  #x7F ;; U+007F (DEL)
+                  ))
+    (toml-test:buffer-setup
+     (format "# comment %c here" char)
+     (should-error (toml:seek-readable-point) :type 'toml-comment-error)))
+  ;; Tab (U+0009) is allowed in comments
+  (toml-test:buffer-setup
+   (format "# comment %c here" #x09)
+   (should-not (condition-case nil
+                   (progn (toml:seek-readable-point) nil)
+                 (toml-comment-error t)))))
+
 (ert-deftest toml-test:read-boolean ()
   (toml-test:buffer-setup
    "true"
