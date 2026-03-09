@@ -187,6 +187,10 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 (put 'toml-array-table-error 'error-conditions
      '(toml-array-table-error toml-error error))
 
+(put 'toml-comment-error 'error-message "Bad comment")
+(put 'toml-comment-error 'error-conditions
+     '(toml-comment-error toml-error error))
+
 (put 'toml-inline-table-error 'error-message "Bad inline table")
 (put 'toml-inline-table-error 'error-conditions
      '(toml-inline-table-error toml-error error))
@@ -235,7 +239,11 @@ Skip target:
   (toml:seek-non-whitespace)
   (while (and (not (eobp))
               (char-equal (toml:get-char-at-point) ?#))
-    (end-of-line)
+    (forward-char) ; skip '#'
+    (while (and (not (eobp)) (not (toml:end-of-line-p)))
+      (when (toml:control-char-p (toml:get-char-at-point))
+        (signal 'toml-comment-error (list (point))))
+      (forward-char))
     (unless (eobp)
       (toml:seek-beginning-of-next-line)
       (toml:seek-non-whitespace))))
