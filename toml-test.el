@@ -480,6 +480,34 @@ aiueo"
    (let ((numeric (toml:read-numeric)))
      (should (toml:end-of-line-p))
      (should (equal 1e11 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "5e06" ;; Leading zeroes in exponent parts of floats
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 5e6 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "1e0022"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 1e22 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "3.14e007"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal 3.14e7 numeric))
+     (should (floatp numeric))))
+
+  (toml-test:buffer-setup
+   "-1e-001"
+   (let ((numeric (toml:read-numeric)))
+     (should (toml:end-of-line-p))
+     (should (equal -0.1 numeric))
      (should (floatp numeric)))))
 
 (ert-deftest toml-test:read-numeric-hex ()
