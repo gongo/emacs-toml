@@ -1101,6 +1101,15 @@ Example:
                 (dolist (path (toml:collect-inline-table-paths base-path current-value))
                   (push path inline-table-registry))))
 
+            ;; Register dotted-key-defined implicit tables in table-history
+            ;; to prevent [table] headers from reopening them (TOML v1.0.0)
+            (when (and (not current-array-table) dotted-table)
+              (let ((prefix current-table))
+                (dolist (seg dotted-table)
+                  (setq prefix (append prefix (list seg)))
+                  (unless (member prefix table-history)
+                    (push prefix table-history)))))
+
             ;; Add to appropriate structure
             (if current-array-table
                 ;; Add to array table element

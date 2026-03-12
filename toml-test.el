@@ -1655,3 +1655,41 @@ regex = '''\\d{4}-\\d{2}-\\d{2}'''
   (let ((parsed (toml:read-from-string "a.b = 1\nc = { d = 2 }")))
     (should (equal 1 (cdr (assoc "b" (cdr (assoc "a" parsed))))))
     (should (equal 2 (cdr (assoc "d" (cdr (assoc "c" parsed))))))))
+
+(ert-deftest toml-test-error:dotted-key-implicit-table-reopen-root ()
+  "Reopening implicit table defined by root dotted key should error."
+  (should-error (toml:read-from-string "fruit.apple.color = \"red\"\n[fruit.apple]")
+                :type 'toml-redefine-table-error))
+
+(ert-deftest toml-test-error:dotted-key-implicit-table-reopen-under-table ()
+  "Reopening implicit table defined by dotted key under [table] should error."
+  (should-error (toml:read-from-string "[fruit]\napple.color = \"red\"\n[fruit.apple]")
+                :type 'toml-redefine-table-error))
+
+(ert-deftest toml-test-error:dotted-key-implicit-table-reopen-nested ()
+  "Reopening nested implicit table defined by dotted key should error."
+  (should-error (toml:read-from-string "[fruit]\napple.taste.sweet = true\n[fruit.apple.taste]")
+                :type 'toml-redefine-table-error))
+
+(ert-deftest toml-test-error:dotted-key-implicit-table-reopen-self ()
+  "Reopening root implicit table itself should error."
+  (should-error (toml:read-from-string "a.b.c = 1\n[a]")
+                :type 'toml-redefine-table-error))
+
+(ert-deftest toml-test:dotted-key-new-subtable-ok ()
+  "New subtable under dotted-key-defined table should be allowed."
+  (let ((parsed (toml:read-from-string "fruit.apple.color = \"red\"\n[fruit.apple.texture]\nsmooth = true")))
+    (should (equal "red" (cdr (assoc "color" (cdr (assoc "apple" (cdr (assoc "fruit" parsed))))))))
+    (should (equal t (cdr (assoc "smooth" (cdr (assoc "texture" (cdr (assoc "apple" (cdr (assoc "fruit" parsed))))))))))))
+
+(ert-deftest toml-test:dotted-key-multiple-same-prefix-ok ()
+  "Multiple dotted keys with same implicit prefix should be allowed."
+  (let ((parsed (toml:read-from-string "a.b = 1\na.c = 2")))
+    (should (equal 1 (cdr (assoc "b" (cdr (assoc "a" parsed))))))
+    (should (equal 2 (cdr (assoc "c" (cdr (assoc "a" parsed))))))))
+
+(ert-deftest toml-test:dotted-key-under-table-same-prefix-ok ()
+  "Multiple dotted keys with same prefix under [table] should be allowed."
+  (let ((parsed (toml:read-from-string "[a]\nb.c = 1\nb.d = 2")))
+    (should (equal 1 (cdr (assoc "c" (cdr (assoc "b" (cdr (assoc "a" parsed))))))))
+    (should (equal 2 (cdr (assoc "d" (cdr (assoc "b" (cdr (assoc "a" parsed))))))))))
