@@ -8,6 +8,15 @@ emacs-toml
 * Learn all about TOML here: https://github.com/mojombo/toml
 * Support version: [v0.5.0](https://github.com/toml-lang/toml/blob/main/CHANGELOG.md#050--2018-07-11)
 
+## Versioning
+
+emacs-toml uses the version format `x.y.z.N`.
+
+- `x.y.z` — The version of the [TOML specification](https://toml.io/) that emacs-toml supports.
+- `.N` — The release number of emacs-toml itself. This number increments when there are changes to emacs-toml (bug fixes, internal improvements, etc.) without a change in the supported TOML specification version.
+
+For example, `1.0.0.0` is the initial release supporting TOML v1.0.0, and `1.0.0.1` would be the first patch release with bug fixes or improvements.
+
 ## Example
 
 Parse the [example.toml](https://github.com/mojombo/toml/blob/master/tests/example.toml) as an example.
