@@ -976,7 +976,8 @@ Example:
         current-value
         hashes
         table-history
-        array-table-registry)    ; Alist of ("key.path" . last-index)
+        array-table-registry     ; Alist of ("key.path" . last-index)
+        inline-table-registry)   ; List of paths defined by inline tables
     (while (not (eobp))
       (toml:seek-readable-point)
 
@@ -991,6 +992,8 @@ Example:
                (push keys table-history))))
         (cond
          ((eq type 'single)
+          ;; Check if this table conflicts with an inline table
+          (toml:check-inline-table-conflict keys inline-table-registry)
           ;; Check if this table conflicts with an existing array table
           (let ((key-str (mapconcat 'identity keys ".")))
             (when (assoc key-str array-table-registry)
@@ -1010,6 +1013,8 @@ Example:
               (setq current-array-sub-keys nil))))
 
          ((eq type 'array)
+          ;; Check if this array table conflicts with an inline table
+          (toml:check-inline-table-conflict keys inline-table-registry)
           ;; Array of tables
           ;; Check if trying to append to a statically defined array
           (let* ((key-str (mapconcat 'identity keys "."))
@@ -1083,9 +1088,18 @@ Example:
                     (setq prefix (append prefix (list seg)))
                     (let ((existing (toml:assoc prefix hashes)))
                       (when (and existing (not (toml:alistp (cdr existing))))
-                        (signal 'toml-redefine-key-error (list (point)))))))))
+                        (signal 'toml-redefine-key-error (list (point))))))))
+              ;; Check inline table immutability
+              (when full-path
+                (toml:check-inline-table-conflict full-path inline-table-registry)))
 
             (setq current-value (toml:read-value))
+
+            ;; Register inline table paths
+            (when (and (not current-array-table) current-value (toml:alistp current-value))
+              (let ((base-path (append effective-table (list leaf-key))))
+                (dolist (path (toml:collect-inline-table-paths base-path current-value))
+                  (push path inline-table-registry))))
 
             ;; Add to appropriate structure
             (if current-array-table
