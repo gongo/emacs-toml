@@ -195,6 +195,10 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 (put 'toml-inline-table-error 'error-conditions
      '(toml-inline-table-error toml-error error))
 
+(put 'toml-inline-table-immutable-error 'error-message "Inline table is immutable")
+(put 'toml-inline-table-immutable-error 'error-conditions
+     '(toml-inline-table-immutable-error toml-error error))
+
 (defun toml:assoc (keys hash)
   "Look up nested KEYS in HASH and return the found element.
 
@@ -217,6 +221,24 @@ Example:
       (dolist (al alist)
         (unless (consp al) (throw 'break nil)))
       t)))
+
+(defun toml:collect-inline-table-paths (prefix alist)
+  "Collect PREFIX and all nested sub-table paths within ALIST."
+  (let ((result (list prefix)))
+    (dolist (entry alist)
+      (when (toml:alistp (cdr entry))
+        (setq result (append result
+                             (toml:collect-inline-table-paths
+                              (append prefix (list (car entry)))
+                              (cdr entry))))))
+    result))
+
+(defun toml:check-inline-table-conflict (path registry)
+  "Signal error if PATH equals or extends any path in REGISTRY."
+  (dolist (registered registry)
+    (when (and (<= (length registered) (length path))
+               (equal registered (butlast path (- (length path) (length registered)))))
+      (signal 'toml-inline-table-immutable-error (list path)))))
 
 (defun toml:end-of-line-p ()
   (looking-at "$"))
