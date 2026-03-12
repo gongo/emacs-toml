@@ -331,8 +331,17 @@ and trims immediate newline after opening delimiter."
           (if (eq char ?\\)
               (push (toml:read-escaped-char) characters)
             (push (toml:read-char) characters))))))
-    ;; Skip the closing """
-    (forward-char 3)
+    ;; Up to 2 extra quotes allowed before closing """
+    (let ((quote-count 0))
+      (save-excursion
+        (while (and (not (eobp)) (eq (char-after) ?\"))
+          (setq quote-count (1+ quote-count))
+          (forward-char)))
+      (when (>= quote-count 6)
+        (signal 'toml-string-error (list (point))))
+      (dotimes (_ (- quote-count 3))
+        (push "\"" characters))
+      (forward-char quote-count))
     (apply #'concat (nreverse characters))))
 
 (defun toml:read-string ()
@@ -375,8 +384,17 @@ No escape processing. Trims immediate newline after opening delimiter."
                    (not (eq char ?\r)))
           (signal 'toml-string-error (list (point)))))
       (push (toml:read-char) characters))
-    ;; Skip the closing '''
-    (forward-char 3)
+    ;; Up to 2 extra quotes allowed before closing '''
+    (let ((quote-count 0))
+      (save-excursion
+        (while (and (not (eobp)) (eq (char-after) ?\'))
+          (setq quote-count (1+ quote-count))
+          (forward-char)))
+      (when (>= quote-count 6)
+        (signal 'toml-string-error (list (point))))
+      (dotimes (_ (- quote-count 3))
+        (push "'" characters))
+      (forward-char quote-count))
     (apply #'concat (nreverse characters))))
 
 (defun toml:read-literal-string ()

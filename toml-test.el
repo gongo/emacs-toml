@@ -1396,6 +1396,33 @@ Two\"\"\""
    "\"\"\"Say \"Hello\" to me\"\"\""
    (should (equal "Say \"Hello\" to me" (toml:read-string)))))
 
+(ert-deftest toml-test:read-multiline-basic-string-extra-quotes ()
+  ;; 4-quote closing: """" = content + closing """
+  (toml-test:buffer-setup
+   "\"\"\"\"This,\" she said, \"is just a pointless statement.\"\"\"\""
+   (should (equal "\"This,\" she said, \"is just a pointless statement.\"" (toml:read-string))))
+
+  ;; 5-quote closing: """"" = content + closing """
+  (toml-test:buffer-setup
+   "\"\"\"\"\"I'm a five-quote string\"\"\"\"\""
+   (should (equal "\"\"I'm a five-quote string\"\"" (toml:read-string))))
+
+  ;; 7 quotes: """ + " + """ = single quote content
+  (toml-test:buffer-setup
+   (make-string 7 ?\")
+   (should (equal "\"" (toml:read-string))))
+
+  ;; 8 quotes: """ + "" + """ = two quote content
+  (toml-test:buffer-setup
+   (make-string 8 ?\")
+   (should (equal "\"\"" (toml:read-string)))))
+
+(ert-deftest toml-test-error:read-multiline-basic-string-too-many-quotes ()
+  ;; 9 quotes: """ + 6 = error
+  (toml-test:buffer-setup
+   (make-string 9 ?\")
+   (should-error (toml:read-string) :type 'toml-string-error)))
+
 (ert-deftest toml-test:read-multiline-basic-string-empty ()
   (toml-test:buffer-setup
    "\"\"\"\"\"\""
@@ -1431,6 +1458,33 @@ line2'''"
   (toml-test:buffer-setup
    "'''Hello ''World'''"
    (should (equal "Hello ''World" (toml:read-literal-string)))))
+
+(ert-deftest toml-test:read-multiline-literal-string-extra-quotes ()
+  ;; 4-quote closing: '''' = content + closing '''
+  (toml-test:buffer-setup
+   "''''That,' she said, 'is still pointless.''''"
+   (should (equal "'That,' she said, 'is still pointless.'" (toml:read-literal-string))))
+
+  ;; 5-quote closing: ''''' = content + closing '''
+  (toml-test:buffer-setup
+   "'''''I have apostrophes'''''"
+   (should (equal "''I have apostrophes''" (toml:read-literal-string))))
+
+  ;; 7 quotes: ''' + ' + ''' = single quote content
+  (toml-test:buffer-setup
+   "'''''''"
+   (should (equal "'" (toml:read-literal-string))))
+
+  ;; 8 quotes: ''' + '' + ''' = two quote content
+  (toml-test:buffer-setup
+   "''''''''"
+   (should (equal "''" (toml:read-literal-string)))))
+
+(ert-deftest toml-test-error:read-multiline-literal-string-too-many-quotes ()
+  ;; 9 quotes: ''' + 6 = error
+  (toml-test:buffer-setup
+   "'''''''''"
+   (should-error (toml:read-literal-string) :type 'toml-string-error)))
 
 (ert-deftest toml-test:read-multiline-literal-string-empty ()
   (toml-test:buffer-setup
