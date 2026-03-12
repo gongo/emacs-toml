@@ -1608,3 +1608,50 @@ regex = '''\\d{4}-\\d{2}-\\d{2}'''
                     (cdr (assoc "multiline" (cdr (assoc "section" parsed))))))
      (should (equal "\\d{4}-\\d{2}-\\d{2}"
                     (cdr (assoc "regex" (cdr (assoc "section" parsed)))))))))
+
+(ert-deftest toml-test-error:inline-table-immutable-dotted-key ()
+  "Dotted key extending an inline table should error."
+  (should-error (toml:read-from-string "type = { name = \"Nail\" }\ntype.edible = false")
+                :type 'toml-inline-table-immutable-error))
+
+(ert-deftest toml-test-error:inline-table-immutable-reopen-table ()
+  "Reopening an inline table with [table] should error."
+  (should-error (toml:read-from-string "type = { name = \"Nail\" }\n[type]\nedible = false")
+                :type 'toml-inline-table-immutable-error))
+
+(ert-deftest toml-test-error:inline-table-immutable-nested-dotted ()
+  "Extending a nested inline table with dotted key should error."
+  (should-error (toml:read-from-string "t = { inner = { x = 1 } }\nt.inner.y = 2")
+                :type 'toml-inline-table-immutable-error))
+
+(ert-deftest toml-test-error:inline-table-immutable-nested-reopen ()
+  "Reopening a nested inline table with [table] should error."
+  (should-error (toml:read-from-string "t = { inner = { x = 1 } }\n[t.inner]\ny = 2")
+                :type 'toml-inline-table-immutable-error))
+
+(ert-deftest toml-test-error:inline-table-immutable-under-table ()
+  "Extending an inline table under [table] with dotted key should error."
+  (should-error (toml:read-from-string "[product]\ntype = { name = \"Nail\" }\ntype.edible = false")
+                :type 'toml-inline-table-immutable-error))
+
+(ert-deftest toml-test-error:inline-table-immutable-under-table-reopen ()
+  "Reopening an inline table under [table] with [table] header should error."
+  (should-error (toml:read-from-string "[product]\ntype = { name = \"Nail\" }\n[product.type]\nedible = false")
+                :type 'toml-inline-table-immutable-error))
+
+(ert-deftest toml-test-error:inline-table-immutable-dotted-key-intermediate ()
+  "Dotted key creating intermediate table in inline table is also immutable."
+  (should-error (toml:read-from-string "t = { a.b = 1 }\nt.a.c = 2")
+                :type 'toml-inline-table-immutable-error))
+
+(ert-deftest toml-test:inline-table-independent-ok ()
+  "Independent inline tables should not conflict."
+  (let ((parsed (toml:read-from-string "a = { x = 1 }\nb = { y = 2 }")))
+    (should (equal 1 (cdr (assoc "x" (cdr (assoc "a" parsed))))))
+    (should (equal 2 (cdr (assoc "y" (cdr (assoc "b" parsed))))))))
+
+(ert-deftest toml-test:inline-table-different-path-ok ()
+  "Dotted key and inline table at different paths should not conflict."
+  (let ((parsed (toml:read-from-string "a.b = 1\nc = { d = 2 }")))
+    (should (equal 1 (cdr (assoc "b" (cdr (assoc "a" parsed))))))
+    (should (equal 2 (cdr (assoc "d" (cdr (assoc "c" parsed))))))))

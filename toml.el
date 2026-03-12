@@ -195,6 +195,10 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 (put 'toml-inline-table-error 'error-conditions
      '(toml-inline-table-error toml-error error))
 
+(put 'toml-inline-table-immutable-error 'error-message "Inline table is immutable")
+(put 'toml-inline-table-immutable-error 'error-conditions
+     '(toml-inline-table-immutable-error toml-error error))
+
 (defun toml:assoc (keys hash)
   "Look up nested KEYS in HASH and return the found element.
 
@@ -217,6 +221,24 @@ Example:
       (dolist (al alist)
         (unless (consp al) (throw 'break nil)))
       t)))
+
+(defun toml:collect-inline-table-paths (prefix alist)
+  "Collect PREFIX and all nested sub-table paths within ALIST."
+  (let ((result (list prefix)))
+    (dolist (entry alist)
+      (when (toml:alistp (cdr entry))
+        (setq result (append result
+                             (toml:collect-inline-table-paths
+                              (append prefix (list (car entry)))
+                              (cdr entry))))))
+    result))
+
+(defun toml:check-inline-table-conflict (path registry)
+  "Signal error if PATH equals or extends any path in REGISTRY."
+  (dolist (registered registry)
+    (when (and (<= (length registered) (length path))
+               (equal registered (butlast path (- (length path) (length registered)))))
+      (signal 'toml-inline-table-immutable-error (list path)))))
 
 (defun toml:end-of-line-p ()
   (looking-at "$"))
@@ -954,7 +976,8 @@ Example:
         current-value
         hashes
         table-history
-        array-table-registry)    ; Alist of ("key.path" . last-index)
+        array-table-registry     ; Alist of ("key.path" . last-index)
+        inline-table-registry)   ; List of paths defined by inline tables
     (while (not (eobp))
       (toml:seek-readable-point)
 
@@ -969,6 +992,8 @@ Example:
                (push keys table-history))))
         (cond
          ((eq type 'single)
+          ;; Check if this table conflicts with an inline table
+          (toml:check-inline-table-conflict keys inline-table-registry)
           ;; Check if this table conflicts with an existing array table
           (let ((key-str (mapconcat 'identity keys ".")))
             (when (assoc key-str array-table-registry)
@@ -988,6 +1013,8 @@ Example:
               (setq current-array-sub-keys nil))))
 
          ((eq type 'array)
+          ;; Check if this array table conflicts with an inline table
+          (toml:check-inline-table-conflict keys inline-table-registry)
           ;; Array of tables
           ;; Check if trying to append to a statically defined array
           (let* ((key-str (mapconcat 'identity keys "."))
@@ -1061,9 +1088,18 @@ Example:
                     (setq prefix (append prefix (list seg)))
                     (let ((existing (toml:assoc prefix hashes)))
                       (when (and existing (not (toml:alistp (cdr existing))))
-                        (signal 'toml-redefine-key-error (list (point)))))))))
+                        (signal 'toml-redefine-key-error (list (point))))))))
+              ;; Check inline table immutability
+              (when full-path
+                (toml:check-inline-table-conflict full-path inline-table-registry)))
 
             (setq current-value (toml:read-value))
+
+            ;; Register inline table paths
+            (when (and (not current-array-table) current-value (toml:alistp current-value))
+              (let ((base-path (append effective-table (list leaf-key))))
+                (dolist (path (toml:collect-inline-table-paths base-path current-value))
+                  (push path inline-table-registry))))
 
             ;; Add to appropriate structure
             (if current-array-table
