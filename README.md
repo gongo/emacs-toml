@@ -6,7 +6,7 @@ emacs-toml
 `toml.el` is a library for parsing TOML (Tom's Obvious, Minimal Language).
 
 * Learn all about TOML here: https://github.com/mojombo/toml
-* Support version: [v0.5.0](https://github.com/toml-lang/toml/blob/main/CHANGELOG.md#050--2018-07-11)
+* Support version: [v1.0.0](https://github.com/toml-lang/toml/blob/main/CHANGELOG.md#100--2021-01-11)
 
 ## Versioning
 
@@ -122,7 +122,7 @@ make test
 
 This project also includes tests using the official [toml-lang/toml-test](https://github.com/toml-lang/toml-test) suite as a git submodule.
 
-**Note:** Since `emacs-toml` currently supports TOML v0.5.0, some tests from the official suite (which targets TOML v1.1.0) will fail. This is expected.
+**Note:** Since `emacs-toml` currently supports TOML v1.0.0, some tests from the official suite (which targets TOML v1.1.0) may fail. This is expected.
 
 To run the official test suite:
 
