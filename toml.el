@@ -277,9 +277,10 @@ Skip target:
 (defun toml:search-forward (regexp)
   "Search forward from point for regular expression REGEXP.
 Move point to the end of the occurrence found, and return point."
-  (when (looking-at regexp)
-    (forward-char (length (match-string-no-properties 0)))
-    t))
+  (let ((case-fold-search nil))
+    (when (looking-at regexp)
+      (forward-char (length (match-string-no-properties 0)))
+      t)))
 
 (defun toml:read-char (&optional char-p)
   "Read character at point.  Set point to next point.
