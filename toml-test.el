@@ -193,6 +193,15 @@ aiueo"
 
   (toml-test:buffer-setup
    " false"
+   (should-error (toml:read-boolean) :type 'toml-boolean-error))
+
+  ;; mixed-case
+  (toml-test:buffer-setup
+   "falsE"
+   (should-error (toml:read-boolean) :type 'toml-boolean-error))
+
+  (toml-test:buffer-setup
+   "trUe"
    (should-error (toml:read-boolean) :type 'toml-boolean-error)))
 
 (ert-deftest toml-test:validate-date ()
