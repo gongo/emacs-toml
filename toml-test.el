@@ -753,11 +753,53 @@ aiueo"
    "{ a = 1 b = 2 }"
    (should-error (toml:read-inline-table) :type 'toml-inline-table-error))
 
-  ;; TODO: Trailing comma in inline tables is allowed from TOML v1.1.0.
-  ;; Until then, it should be rejected.
+  ;; Trailing comma is allowed
   (toml-test:buffer-setup
    "{ a = 1, b = 2, }"
-   (should-error (toml:read-inline-table) :type 'toml-inline-table-error)))
+   (let ((result (toml:read-inline-table)))
+     (should (equal 1 (cdr (assoc "a" result))))
+     (should (equal 2 (cdr (assoc "b" result)))))))
+
+(ert-deftest toml-test:read-inline-table-multiline ()
+  ;; Empty table with newline
+  (toml-test:buffer-setup
+   "{\n}"
+   (should (equal nil (toml:read-inline-table))))
+
+  ;; Single pair with newlines
+  (toml-test:buffer-setup
+   "{\n  name = \"Tom\"\n}"
+   (let ((result (toml:read-inline-table)))
+     (should (equal "Tom" (cdr (assoc "name" result))))))
+
+  ;; Multiple pairs with newlines
+  (toml-test:buffer-setup
+   "{\n  a = 1,\n  b = 2\n}"
+   (let ((result (toml:read-inline-table)))
+     (should (equal 1 (cdr (assoc "a" result))))
+     (should (equal 2 (cdr (assoc "b" result))))))
+
+  ;; Multiple pairs with newlines and trailing comma
+  (toml-test:buffer-setup
+   "{\n  a = 1,\n  b = 2,\n}"
+   (let ((result (toml:read-inline-table)))
+     (should (equal 1 (cdr (assoc "a" result))))
+     (should (equal 2 (cdr (assoc "b" result))))))
+
+  ;; With comment
+  (toml-test:buffer-setup
+   "{\n  # comment\n  a = 1\n}"
+   (let ((result (toml:read-inline-table)))
+     (should (equal 1 (cdr (assoc "a" result)))))))
+
+(ert-deftest toml-test:read-from-string-inline-table-multiline ()
+  (let ((result (toml:read-from-string "\
+name = {
+  first = \"Tom\",
+  last = \"Preston-Werner\",
+}")))
+    (should (equal "Tom" (cdr (assoc "first" (cdr (assoc "name" result))))))
+    (should (equal "Preston-Werner" (cdr (assoc "last" (cdr (assoc "name" result))))))))
 
 (ert-deftest toml-test:read-table ()
   (toml-test:buffer-setup
