@@ -73,9 +73,8 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 \\(0[1-9]\\|1[0-2]\\)-\
 \\(0[1-9]\\|[1-2][0-9]\\|3[0-1]\\)[Tt ]\
 \\([0-1][0-9]\\|2[0-3]\\):\
-\\([0-5][0-9]\\):\
 \\([0-5][0-9]\\)\
-\\(?:\\.\\([0-9]+\\)\\)?\
+\\(?::\\([0-5][0-9]\\)\\(?:\\.\\([0-9]+\\)\\)?\\)?\
 \\(Z\\|[+-][0-9]\\{2\\}:[0-9]\\{2\\}\\)"
   "Regular expression for RFC 3339 datetime with timezone and fractional seconds.")
 
@@ -85,9 +84,8 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 \\(0[1-9]\\|1[0-2]\\)-\
 \\(0[1-9]\\|[1-2][0-9]\\|3[0-1]\\)[Tt ]\
 \\([0-1][0-9]\\|2[0-3]\\):\
-\\([0-5][0-9]\\):\
 \\([0-5][0-9]\\)\
-\\(?:\\.\\([0-9]+\\)\\)?"
+\\(?::\\([0-5][0-9]\\)\\(?:\\.\\([0-9]+\\)\\)?\\)?"
   "Regular expression for local date-time (no timezone).")
 
 (defconst toml->regexp-local-date
@@ -100,9 +98,8 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 (defconst toml->regexp-local-time
   "\
 \\([0-1][0-9]\\|2[0-3]\\):\
-\\([0-5][0-9]\\):\
 \\([0-5][0-9]\\)\
-\\(?:\\.\\([0-9]+\\)\\)?"
+\\(?::\\([0-5][0-9]\\)\\(?:\\.\\([0-9]+\\)\\)?\\)?"
   "Regular expression for local time (time only, no date).")
 
 (defconst toml->regexp-hex
@@ -473,7 +470,7 @@ Move point to the end of read datetime string."
         (day      (string-to-number (match-string-no-properties 3)))
         (hour     (string-to-number (match-string-no-properties 4)))
         (minute   (string-to-number (match-string-no-properties 5)))
-        (second   (string-to-number (match-string-no-properties 6)))
+        (second   (let ((s (match-string-no-properties 6))) (if s (string-to-number s) 0)))
         (fraction (match-string-no-properties 7))  ; optional
         (timezone (match-string-no-properties 8))) ; Z or +HH:MM or -HH:MM
     (toml:validate-date year month day)
@@ -497,7 +494,7 @@ Move point to the end of read datetime string."
         (day      (string-to-number (match-string-no-properties 3)))
         (hour     (string-to-number (match-string-no-properties 4)))
         (minute   (string-to-number (match-string-no-properties 5)))
-        (second   (string-to-number (match-string-no-properties 6)))
+        (second   (let ((s (match-string-no-properties 6))) (if s (string-to-number s) 0)))
         (fraction (match-string-no-properties 7)))
     (toml:validate-date year month day)
     `((year . ,year)
@@ -530,7 +527,7 @@ Move point to the end of read time string."
     (signal 'toml-datetime-error (list (point))))
   (let ((hour     (string-to-number (match-string-no-properties 1)))
         (minute   (string-to-number (match-string-no-properties 2)))
-        (second   (string-to-number (match-string-no-properties 3)))
+        (second   (let ((s (match-string-no-properties 3))) (if s (string-to-number s) 0)))
         (fraction (match-string-no-properties 4)))
     `((hour . ,hour)
       (minute . ,minute)
