@@ -46,6 +46,7 @@
     (?n . ?\n)    ; linefeed        (U+000A)
     (?f . ?\f)    ; form feed       (U+000C)
     (?r . ?\r)    ; carriage return (U+000D)
+    (?e . ?\e)    ; escape          (U+001B)
     (?\" . ?\")   ; quote           (U+0022)
     (?\\ . ?\\))  ; backslash       (U+005C)
   "Alist mapping TOML escape characters to their actual values.
@@ -303,6 +304,9 @@ Move point to the end of read characters."
          (mapped (assq char toml->escape-sequence-alist)))
     (cond
      (mapped (char-to-string (cdr mapped)))
+     ((and (eq char ?x)
+           (toml:search-forward "[0-9A-Fa-f]\\{2\\}"))
+      (char-to-string (string-to-number (match-string 0) 16)))
      ((and (eq char ?u)
            (toml:search-forward "[0-9A-Fa-f]\\{4\\}"))
       (let ((code-point (string-to-number (match-string 0) 16)))
