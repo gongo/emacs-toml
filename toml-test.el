@@ -1700,3 +1700,114 @@ regex = '''\\d{4}-\\d{2}-\\d{2}'''
   (let ((parsed (toml:read-from-string "[a]\nb.c = 1\nb.d = 2")))
     (should (equal 1 (cdr (assoc "c" (cdr (assoc "b" (cdr (assoc "a" parsed))))))))
     (should (equal 2 (cdr (assoc "d" (cdr (assoc "b" (cdr (assoc "a" parsed))))))))))
+
+(ert-deftest toml-test:datetime-seconds-optional-Z ()
+  "Offset datetime with seconds omitted and Z timezone."
+  (toml-test:buffer-setup
+   "1979-05-27T07:32Z"
+   (let ((dt (toml:read-datetime)))
+     (should (equal 1979 (cdr (assoc 'year dt))))
+     (should (equal 5    (cdr (assoc 'month dt))))
+     (should (equal 27   (cdr (assoc 'day dt))))
+     (should (equal 7    (cdr (assoc 'hour dt))))
+     (should (equal 32   (cdr (assoc 'minute dt))))
+     (should (equal 0    (cdr (assoc 'second dt))))
+     (should (equal nil  (cdr (assoc 'fraction dt))))
+     (should (equal "Z"  (cdr (assoc 'timezone dt)))))))
+
+(ert-deftest toml-test:datetime-seconds-optional-positive-offset ()
+  "Offset datetime with seconds omitted and positive timezone offset."
+  (toml-test:buffer-setup
+   "1979-05-27T07:32+05:30"
+   (let ((dt (toml:read-datetime)))
+     (should (equal 1979     (cdr (assoc 'year dt))))
+     (should (equal 5        (cdr (assoc 'month dt))))
+     (should (equal 27       (cdr (assoc 'day dt))))
+     (should (equal 7        (cdr (assoc 'hour dt))))
+     (should (equal 32       (cdr (assoc 'minute dt))))
+     (should (equal 0        (cdr (assoc 'second dt))))
+     (should (equal nil      (cdr (assoc 'fraction dt))))
+     (should (equal "+05:30" (cdr (assoc 'timezone dt)))))))
+
+(ert-deftest toml-test:datetime-seconds-optional-negative-offset ()
+  "Offset datetime with seconds omitted and negative timezone offset."
+  (toml-test:buffer-setup
+   "1979-05-27T07:32-07:00"
+   (let ((dt (toml:read-datetime)))
+     (should (equal 1979     (cdr (assoc 'year dt))))
+     (should (equal 5        (cdr (assoc 'month dt))))
+     (should (equal 27       (cdr (assoc 'day dt))))
+     (should (equal 7        (cdr (assoc 'hour dt))))
+     (should (equal 32       (cdr (assoc 'minute dt))))
+     (should (equal 0        (cdr (assoc 'second dt))))
+     (should (equal nil      (cdr (assoc 'fraction dt))))
+     (should (equal "-07:00" (cdr (assoc 'timezone dt)))))))
+
+(ert-deftest toml-test:datetime-seconds-optional-space-separator ()
+  "Offset datetime with seconds omitted and space separator."
+  (toml-test:buffer-setup
+   "1979-05-27 07:32Z"
+   (let ((dt (toml:read-datetime)))
+     (should (equal 1979 (cdr (assoc 'year dt))))
+     (should (equal 5    (cdr (assoc 'month dt))))
+     (should (equal 27   (cdr (assoc 'day dt))))
+     (should (equal 7    (cdr (assoc 'hour dt))))
+     (should (equal 32   (cdr (assoc 'minute dt))))
+     (should (equal 0    (cdr (assoc 'second dt))))
+     (should (equal nil  (cdr (assoc 'fraction dt))))
+     (should (equal "Z"  (cdr (assoc 'timezone dt)))))))
+
+(ert-deftest toml-test:local-datetime-seconds-optional ()
+  "Local datetime with seconds omitted."
+  (toml-test:buffer-setup
+   "1979-05-27T07:32"
+   (let ((dt (toml:read-local-datetime)))
+     (should (equal 1979 (cdr (assoc 'year dt))))
+     (should (equal 5    (cdr (assoc 'month dt))))
+     (should (equal 27   (cdr (assoc 'day dt))))
+     (should (equal 7    (cdr (assoc 'hour dt))))
+     (should (equal 32   (cdr (assoc 'minute dt))))
+     (should (equal 0    (cdr (assoc 'second dt))))
+     (should (equal nil  (cdr (assoc 'fraction dt)))))))
+
+(ert-deftest toml-test:local-datetime-seconds-optional-space ()
+  "Local datetime with seconds omitted and space separator."
+  (toml-test:buffer-setup
+   "1979-05-27 07:32"
+   (let ((dt (toml:read-local-datetime)))
+     (should (equal 1979 (cdr (assoc 'year dt))))
+     (should (equal 5    (cdr (assoc 'month dt))))
+     (should (equal 27   (cdr (assoc 'day dt))))
+     (should (equal 7    (cdr (assoc 'hour dt))))
+     (should (equal 32   (cdr (assoc 'minute dt))))
+     (should (equal 0    (cdr (assoc 'second dt))))
+     (should (equal nil  (cdr (assoc 'fraction dt)))))))
+
+(ert-deftest toml-test:local-time-seconds-optional ()
+  "Local time with seconds omitted."
+  (toml-test:buffer-setup
+   "07:32"
+   (let ((dt (toml:read-local-time)))
+     (should (equal 7   (cdr (assoc 'hour dt))))
+     (should (equal 32  (cdr (assoc 'minute dt))))
+     (should (equal 0   (cdr (assoc 'second dt))))
+     (should (equal nil (cdr (assoc 'fraction dt)))))))
+
+(ert-deftest toml-test:datetime-seconds-optional-integration ()
+  "Integration test: parse seconds-optional datetime values via toml:read-from-string."
+  (let ((parsed (toml:read-from-string "\
+odt1 = 1979-05-27T07:32Z
+odt2 = 1979-05-27T07:32-07:00
+ldt1 = 1979-05-27T07:32
+lt1 = 07:32
+")))
+    (let ((odt1 (cdr (assoc "odt1" parsed))))
+      (should (equal 0   (cdr (assoc 'second odt1))))
+      (should (equal "Z" (cdr (assoc 'timezone odt1)))))
+    (let ((odt2 (cdr (assoc "odt2" parsed))))
+      (should (equal 0        (cdr (assoc 'second odt2))))
+      (should (equal "-07:00" (cdr (assoc 'timezone odt2)))))
+    (let ((ldt1 (cdr (assoc "ldt1" parsed))))
+      (should (equal 0 (cdr (assoc 'second ldt1)))))
+    (let ((lt1 (cdr (assoc "lt1" parsed))))
+      (should (equal 0 (cdr (assoc 'second lt1)))))))
