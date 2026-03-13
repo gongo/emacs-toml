@@ -637,6 +637,7 @@ Otherwise the NEW value takes precedence."
   (unless (eq ?{ (toml:get-char-at-point))
     (signal 'toml-inline-table-error (list (point))))
   (forward-char)
+  (toml:seek-readable-point)
   (let (elements char-after-read)
     (while (not (char-equal (toml:get-char-at-point) ?}))
       (let* ((key-segments (toml:read-key))
@@ -660,11 +661,7 @@ Otherwise the NEW value takes precedence."
         (if (char-equal char-after-read ?,)
             (progn
               (forward-char)
-              (toml:seek-readable-point)
-              ;; TODO: Trailing comma in inline tables is allowed from TOML v1.1.0.
-              ;; Until then, it should be rejected.
-              (when (char-equal (toml:get-char-at-point) ?})
-                (signal 'toml-inline-table-error (list (point)))))
+              (toml:seek-readable-point))
           (signal 'toml-inline-table-error (list (point))))))
     (forward-char)
     (nreverse elements)))
