@@ -348,8 +348,7 @@ and trims immediate newline after opening delimiter."
        (t
         (let ((char (toml:get-char-at-point)))
           (when (and (toml:control-char-p char)
-                     (not (eq char ?\n))
-                     (not (eq char ?\r)))
+                     (not (eq char ?\n)))
             (signal 'toml-string-error (list (point))))
           ;; Regular escape sequence or regular character
           (if (eq char ?\\)
@@ -404,8 +403,7 @@ No escape processing. Trims immediate newline after opening delimiter."
         (signal 'toml-string-error (list (point))))
       (let ((char (toml:get-char-at-point)))
         (when (and (toml:control-char-p char)
-                   (not (eq char ?\n))
-                   (not (eq char ?\r)))
+                   (not (eq char ?\n)))
           (signal 'toml-string-error (list (point)))))
       (push (toml:read-char) characters))
     ;; Up to 2 extra quotes allowed before closing '''
