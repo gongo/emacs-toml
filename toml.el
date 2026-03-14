@@ -472,6 +472,11 @@ Move point to the end of read datetime string."
         (second   (let ((s (match-string-no-properties 6))) (if s (string-to-number s) 0)))
         (fraction (match-string-no-properties 7))  ; optional
         (timezone (match-string-no-properties 8))) ; Z or +HH:MM or -HH:MM
+    (when (and timezone (not (string= timezone "Z")))
+      (let ((tz-hour (string-to-number (substring timezone 1 3)))
+            (tz-minute (string-to-number (substring timezone 4 6))))
+        (unless (and (<= 0 tz-hour 23) (<= 0 tz-minute 59))
+          (signal 'toml-datetime-error (list (point))))))
     (toml:validate-date year month day)
     `((year . ,year)
       (month . ,month)
