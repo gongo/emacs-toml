@@ -1491,6 +1491,12 @@ Two\"\"\""
    "\"\"\"unterminated"
    (should-error (toml:read-string) :type 'toml-string-error)))
 
+(ert-deftest toml-test-error:read-multiline-basic-string-bare-cr ()
+  "Bare CR (not part of CRLF) must be rejected in multiline basic strings."
+  (toml-test:buffer-setup
+   "\"\"\"\rhello\"\"\""
+   (should-error (toml:read-string) :type 'toml-string-error)))
+
 (ert-deftest toml-test:read-multiline-literal-string ()
   (toml-test:buffer-setup
    "'''Hello
@@ -1552,6 +1558,12 @@ line2'''"
 (ert-deftest toml-test-error:read-multiline-literal-string-unterminated ()
   (toml-test:buffer-setup
    "'''unterminated"
+   (should-error (toml:read-literal-string) :type 'toml-string-error)))
+
+(ert-deftest toml-test-error:read-multiline-literal-string-bare-cr ()
+  "Bare CR (not part of CRLF) must be rejected in multiline literal strings."
+  (toml-test:buffer-setup
+   "'''\rhello'''"
    (should-error (toml:read-literal-string) :type 'toml-string-error)))
 
 (ert-deftest toml-test:parse-crlf ()
