@@ -75,7 +75,7 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 \\([0-1][0-9]\\|2[0-3]\\):\
 \\([0-5][0-9]\\)\
 \\(?::\\([0-5][0-9]\\)\\(?:\\.\\([0-9]+\\)\\)?\\)?\
-\\(Z\\|[+-][0-9]\\{2\\}:[0-9]\\{2\\}\\)"
+\\([Zz]\\|[+-][0-9]\\{2\\}:[0-9]\\{2\\}\\)"
   "Regular expression for RFC 3339 datetime with timezone and fractional seconds.")
 
 (defconst toml->regexp-local-datetime
@@ -471,7 +471,13 @@ Move point to the end of read datetime string."
         (minute   (string-to-number (match-string-no-properties 5)))
         (second   (let ((s (match-string-no-properties 6))) (if s (string-to-number s) 0)))
         (fraction (match-string-no-properties 7))  ; optional
-        (timezone (match-string-no-properties 8))) ; Z or +HH:MM or -HH:MM
+        (timezone (let ((tz (match-string-no-properties 8)))
+                    (if (and tz (string= (upcase tz) "Z")) "Z" tz))))
+    (when (and timezone (not (string= timezone "Z")))
+      (let ((tz-hour (string-to-number (substring timezone 1 3)))
+            (tz-minute (string-to-number (substring timezone 4 6))))
+        (unless (and (<= 0 tz-hour 23) (<= 0 tz-minute 59))
+          (signal 'toml-datetime-error (list (point))))))
     (toml:validate-date year month day)
     `((year . ,year)
       (month . ,month)

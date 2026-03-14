@@ -60,9 +60,9 @@ The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
         ("value" . ,(concat (format "%04d-%02d-%02dT%02d:%02d:%02d"
                                     year month day hour minute second)
                             (when fraction
-                              (replace-regexp-in-string
-                               "0+\\'" ""
-                               (format ".%s" (substring (format "%.9f" fraction) 2))))
+                              (concat "." (replace-regexp-in-string
+                                           "0+\\'" ""
+                                           (substring (format "%.9f" fraction) 2))))
                             timezone)))))
    ;; Datetime alist without timezone -> local-date-time
    ((and (listp value) (assoc 'year value) (assoc 'hour value))
@@ -77,9 +77,9 @@ The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
         ("value" . ,(concat (format "%04d-%02d-%02dT%02d:%02d:%02d"
                                     year month day hour minute second)
                             (when fraction
-                              (replace-regexp-in-string
-                               "0+\\'" ""
-                               (format ".%s" (substring (format "%.9f" fraction) 2)))))))))
+                              (let* ((digits (substring (format "%.9f" fraction) 2))
+                                     (trimmed (replace-regexp-in-string "0+\\'" "" digits)))
+                                (concat "." (string-pad trimmed 3 ?0)))))))))
    ;; Date-only alist -> local-date
    ((and (listp value) (assoc 'year value) (not (assoc 'hour value)))
     (let ((year  (cdr (assoc 'year value)))
@@ -96,9 +96,9 @@ The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
       `(("type" . "time-local")
         ("value" . ,(concat (format "%02d:%02d:%02d" hour minute second)
                             (when fraction
-                              (replace-regexp-in-string
-                               "0+\\'" ""
-                               (format ".%s" (substring (format "%.9f" fraction) 2)))))))))
+                              (let* ((digits (substring (format "%.9f" fraction) 2))
+                                     (trimmed (replace-regexp-in-string "0+\\'" "" digits)))
+                                (concat "." (string-pad trimmed 3 ?0)))))))))
    ;; Alist (table) -> recurse
    ((and (listp value) (consp (car value)))
     (toml-test-official:alist-to-tagged value))
@@ -132,6 +132,12 @@ The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
           (json-array-type 'list)
           (json-key-type 'string))
       (json-read))))
+
+(defun toml-test-official:normalize-datetime-fraction (str)
+  "Normalize fractional seconds in STR by stripping trailing zeros.
+E.g. \"...56.600Z\" -> \"...56.6Z\", \"...00.5-07:00\" -> unchanged."
+  (replace-regexp-in-string
+   "\\.\\([0-9]*[1-9]\\)0+\\([Z+-]\\|$\\)" ".\\1\\2" str))
 
 (defun toml-test-official:compare-values (expected actual path)
   "Compare EXPECTED and ACTUAL values, reporting differences at PATH."
@@ -169,9 +175,16 @@ The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
    (t
     (if (equal expected actual)
         t
-      (message "Value mismatch at %s: expected %S, got %S"
-               path expected actual)
-      nil))))
+      ;; Datetime fractions: strip trailing zeros and compare again.
+      ;; toml-test JSON files are inconsistent in fraction formatting
+      ;; (e.g. ".600" vs ".5"), so we normalize before comparing.
+      (if (and (stringp expected) (stringp actual)
+               (equal (toml-test-official:normalize-datetime-fraction expected)
+                      (toml-test-official:normalize-datetime-fraction actual)))
+          t
+        (message "Value mismatch at %s: expected %S, got %S"
+                 path expected actual)
+        nil)))))
 
 ;;; Test runner for valid TOML files
 

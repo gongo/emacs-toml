@@ -368,6 +368,16 @@ aiueo"
      str
      (should-error (toml:read-datetime) :type 'toml-datetime-error))))
 
+(ert-deftest toml-test-error:datetime-offset-overflow-hour ()
+  (toml-test:buffer-setup
+   "1985-06-18T17:04:07+25:00"
+   (should-error (toml:read-datetime) :type 'toml-datetime-error)))
+
+(ert-deftest toml-test-error:datetime-offset-overflow-minute ()
+  (toml-test:buffer-setup
+   "1985-06-18T17:04:07+12:60"
+   (should-error (toml:read-datetime) :type 'toml-datetime-error)))
+
 (ert-deftest toml-test:read-numeric ()
   (toml-test:buffer-setup
    "1"
