@@ -565,6 +565,17 @@ Move point to the end of read numeric string."
    ;; Regular decimal numeric
    ((toml:search-forward toml->regexp-numeric)
     (let ((numeric-str (match-string-no-properties 0)))
+      ;; Reject leading zeros in decimal numbers (e.g., 01, 00, 03.14)
+      ;; Leading zero is only valid for: 0, 0.x, 0ex
+      (let ((abs-str (if (string-match-p "^[+-]" numeric-str)
+                         (substring numeric-str 1)
+                       numeric-str)))
+        (when (and (> (length abs-str) 1)
+                   (eq (aref abs-str 0) ?0)
+                   (let ((c (aref abs-str 1)))
+                     (and (not (eq c ?.))
+                          (not (memq c '(?e ?E))))))
+          (signal 'toml-numeric-error (list (point)))))
       ;; Two-stage validation:
       ;; 1. toml->regexp-numeric (loose) - greedily captures all numeric-like
       ;;    characters to ensure invalid trailing chars (e.g., "1.1.1") are
