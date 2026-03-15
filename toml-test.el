@@ -1953,3 +1953,17 @@ lt1 = 07:32
                 :type 'toml-key-error)
   (should-error (toml:read-from-string "key =")
                 :type 'toml-key-error))
+
+(ert-deftest toml-test:extra-tokens-after-value-rejected ()
+  "Extra tokens after a key-value pair on the same line must be rejected."
+  (should-error (toml:read-from-string "key = 1 foo")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "key = \"val\" extra")
+                :type 'toml-key-error))
+
+(ert-deftest toml-test:extra-tokens-after-table-header-rejected ()
+  "Extra tokens after a table header on the same line must be rejected."
+  (should-error (toml:read-from-string "[table] foo")
+                :type 'toml-table-error)
+  (should-error (toml:read-from-string "[[array]] bar")
+                :type 'toml-table-error))

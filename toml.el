@@ -790,6 +790,10 @@ Behavior differences:
               (signal 'toml-table-error (list (point)))))
           (setq table-keys (nreverse segments))
           (setq table-type (if is-array 'array 'single))
+          ;; After table header, ensure no extra tokens on the same line
+          (skip-chars-forward " \t")
+          (unless (or (eobp) (toml:end-of-line-p) (eq (toml:get-char-at-point) ?#))
+            (signal 'toml-table-error (list (point))))
           ;; Check for table redefinition if checker is provided
           (when (and table-history-checker (eq table-type 'single))
             (funcall table-history-checker table-keys))))
@@ -1196,7 +1200,12 @@ Example:
               (setq hashes (toml:make-table-hashes effective-table
                                                    leaf-key
                                                    current-value
-                                                   hashes))))))
+                                                   hashes)))
+
+            ;; After key-value pair, ensure no extra tokens on the same line
+            (skip-chars-forward " \t")
+            (unless (or (eobp) (toml:end-of-line-p) (eq (toml:get-char-at-point) ?#))
+              (signal 'toml-key-error (list (point)))))))
 
       (toml:seek-readable-point))
     hashes))
