@@ -1903,3 +1903,30 @@ lt1 = 07:32
       (should (equal 0 (cdr (assoc 'second ldt1)))))
     (let ((lt1 (cdr (assoc "lt1" parsed))))
       (should (equal 0 (cdr (assoc 'second lt1)))))))
+
+(ert-deftest toml-test-error:inline-table-duplicate-key-simple ()
+  "Same key defined twice."
+  (should-error (toml:read-from-string "a = {b = 1, b = 2}")
+                :type 'toml-redefine-key-error))
+
+(ert-deftest toml-test-error:inline-table-scalar-then-dotted ()
+  "Nesting into scalar."
+  (should-error (toml:read-from-string "a = {b = 1, b.c = 2}")
+                :type 'toml-redefine-key-error))
+
+(ert-deftest toml-test-error:inline-table-dotted-then-scalar ()
+  "Overwriting implicit table with scalar."
+  (should-error (toml:read-from-string "a = {b.c = 1, b = 2}")
+                :type 'toml-redefine-key-error))
+
+(ert-deftest toml-test-error:inline-table-extend-inner ()
+  "Extending inline table is rejected."
+  (should-error (toml:read-from-string
+                 "a = {inner = {dog = \"best\"}, inner.cat = \"worst\"}")
+                :type 'toml-inline-table-immutable-error))
+
+(ert-deftest toml-test:inline-table-dotted-keys-ok ()
+  "Different leaf keys under same implicit table are allowed."
+  (let ((parsed (toml:read-from-string "a = {b.a = 1, b.c = 2}")))
+    (should (equal 1 (cdr (assoc "a" (cdr (assoc "b" (cdr (assoc "a" parsed))))))))
+    (should (equal 2 (cdr (assoc "c" (cdr (assoc "b" (cdr (assoc "a" parsed))))))))))
