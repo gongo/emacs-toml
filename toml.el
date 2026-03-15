@@ -654,10 +654,49 @@ Otherwise the NEW value takes precedence."
     (signal 'toml-inline-table-error (list (point))))
   (forward-char)
   (toml:seek-readable-point)
-  (let (elements char-after-read)
+  (let (elements char-after-read
+		 defined-paths implicit-paths inline-table-paths)
     (while (not (char-equal (toml:get-char-at-point) ?}))
       (let* ((key-segments (toml:read-key))
-             (value (toml:read-value)))
+             (value (toml:read-value))
+             (full-path key-segments))
+        ;; Validation 1: exact duplicate
+        (when (member full-path defined-paths)
+          (signal 'toml-redefine-key-error (list full-path)))
+        ;; Validation 2: implicit table overwrite
+        ;; (full-path is a proper prefix of an existing defined-path)
+        (dolist (dp defined-paths)
+          (when (and (< (length full-path) (length dp))
+                     (equal full-path (butlast dp (- (length dp) (length full-path)))))
+            (signal 'toml-redefine-key-error (list full-path))))
+        ;; Validation 3: inline table immutability
+        ;; (a proper prefix of full-path is an inline-table-path)
+        (dolist (itp inline-table-paths)
+          (when (and (< (length itp) (length full-path))
+                     (equal itp (butlast full-path (- (length full-path) (length itp)))))
+            (signal 'toml-inline-table-immutable-error (list full-path))))
+        ;; Validation 4: nesting into non-table scalar
+        ;; (a proper prefix of full-path is in defined-paths but not in
+        ;;  implicit-paths or inline-table-paths)
+        (dolist (dp defined-paths)
+          (when (and (< (length dp) (length full-path))
+                     (equal dp (butlast full-path (- (length full-path) (length dp))))
+                     (not (member dp implicit-paths))
+                     (not (member dp inline-table-paths)))
+            (signal 'toml-redefine-key-error (list full-path))))
+        ;; Register paths
+        (push full-path defined-paths)
+        ;; Register intermediate segments as implicit paths
+        (when (> (length key-segments) 1)
+          (let ((prefix nil))
+            (dolist (seg (butlast key-segments))
+              (setq prefix (append prefix (list seg)))
+              (unless (member prefix implicit-paths)
+                (push prefix implicit-paths)))))
+        ;; Register inline table value paths
+        (when (toml:alistp value)
+          (push full-path inline-table-paths))
+        ;; Build elements
         (if (= 1 (length key-segments))
             ;; Simple key: traditional (key . value)
             (push `(,(car key-segments) . ,value) elements)
