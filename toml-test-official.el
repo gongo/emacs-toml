@@ -33,6 +33,18 @@
 
 ;;; Helper functions for converting parsed TOML to toml-test JSON format
 
+(defun toml-test-official:float-to-string (value)
+  "Convert float VALUE to string. Handle inf/nan specially.
+
+toml-test expects \"nan\" without sign (not \"+nan\" or \"-nan\") because
+many languages don't support signed NaN.
+See: https://github.com/toml-lang/toml-test/blob/v2.1.0/tests/valid/float/inf-and-nan.toml#L1-L2"
+  (cond
+   ((isnan value) "nan")
+   ((= value 1.0e+INF) "inf")
+   ((= value -1.0e+INF) "-inf")
+   (t (number-to-string value))))
+
 (defun toml-test-official:value-to-tagged (value)
   "Convert a parsed TOML VALUE to the tagged format used by toml-test.
 The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
@@ -107,7 +119,7 @@ The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
     `(("type" . "integer") ("value" . ,(number-to-string value))))
    ;; Float
    ((floatp value)
-    `(("type" . "float") ("value" . ,(number-to-string value))))
+    `(("type" . "float") ("value" . ,(toml-test-official:float-to-string value))))
    ;; String
    ((stringp value)
     `(("type" . "string") ("value" . ,value)))
