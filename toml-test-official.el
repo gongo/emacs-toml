@@ -147,7 +147,7 @@ E.g. \"...56.600Z\" -> \"...56.6Z\", \"...00.5-07:00\" -> unchanged."
          (or (null expected) (and (consp (car expected)) (stringp (caar expected))))
          (or (null actual) (and (consp (car actual)) (stringp (caar actual)))))
     (let ((all-keys (delete-dups (append (mapcar #'car expected)
-                                          (mapcar #'car actual)))))
+                                         (mapcar #'car actual)))))
       (cl-block nil
         (dolist (key all-keys)
           (let ((exp-val (cdr (assoc key expected)))
@@ -175,16 +175,22 @@ E.g. \"...56.600Z\" -> \"...56.6Z\", \"...00.5-07:00\" -> unchanged."
    (t
     (if (equal expected actual)
         t
-      ;; Datetime fractions: strip trailing zeros and compare again.
-      ;; toml-test JSON files are inconsistent in fraction formatting
-      ;; (e.g. ".600" vs ".5"), so we normalize before comparing.
+      ;; Float value strings: compare numerically (e.g., "0.0" vs "0", "-0.0" vs "-0")
       (if (and (stringp expected) (stringp actual)
-               (equal (toml-test-official:normalize-datetime-fraction expected)
-                      (toml-test-official:normalize-datetime-fraction actual)))
+               (string-match-p "^[+-]?[0-9]" expected)
+               (string-match-p "^[+-]?[0-9]" actual)
+               (= (string-to-number expected) (string-to-number actual)))
           t
-        (message "Value mismatch at %s: expected %S, got %S"
-                 path expected actual)
-        nil)))))
+	;; Datetime fractions: strip trailing zeros and compare again.
+	;; toml-test JSON files are inconsistent in fraction formatting
+	;; (e.g. ".600" vs ".5"), so we normalize before comparing.
+	(if (and (stringp expected) (stringp actual)
+		 (equal (toml-test-official:normalize-datetime-fraction expected)
+			(toml-test-official:normalize-datetime-fraction actual)))
+            t
+          (message "Value mismatch at %s: expected %S, got %S"
+                   path expected actual)
+          nil))))))
 
 ;;; Test runner for valid TOML files
 
