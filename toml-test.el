@@ -589,6 +589,25 @@ aiueo"
      str
      (should-error (toml:read-numeric) :type 'toml-numeric-error))))
 
+(ert-deftest toml-test:read-numeric-leading-zero ()
+  ;; Zero and zero-prefixed floats/exponents are valid
+  (dolist (test '(("0" . 0) ("0.0" . 0.0) ("0e1" . 0.0)))
+    (toml-test:buffer-setup
+     (car test)
+     (should (equal (cdr test) (toml:read-numeric))))))
+
+(ert-deftest toml-test-error:read-numeric-leading-zero ()
+  ;; Integer leading zeros
+  (dolist (str '("01" "00" "0_0" "-01" "+01" "+0_1"))
+    (toml-test:buffer-setup
+     str
+     (should-error (toml:read-numeric) :type 'toml-numeric-error)))
+  ;; Float leading zeros
+  (dolist (str '("03.14" "-03.14" "+03.14"))
+    (toml-test:buffer-setup
+     str
+     (should-error (toml:read-numeric) :type 'toml-numeric-error))))
+
 (ert-deftest toml-test:read-key ()
   (toml-test:buffer-setup
    "a = 3"
