@@ -1944,3 +1944,12 @@ lt1 = 07:32
                 :type 'toml-table-error)
   (should-error (toml:read-from-string "['''key''']")
                 :type 'toml-table-error))
+
+(ert-deftest toml-test:key-without-value-rejected ()
+  "Keys without values must be rejected."
+  (should-error (toml:read-from-string "key = \n")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "key =\n1")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "key =")
+                :type 'toml-key-error))

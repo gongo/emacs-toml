@@ -721,6 +721,13 @@ Otherwise the NEW value takes precedence."
     (forward-char)
     (nreverse elements)))
 
+(defun toml:ensure-value-on-same-line ()
+  "Ensure that a value starts on the same line after `='.
+Only skips spaces and tabs; signals `toml-key-error' if EOL or EOB."
+  (skip-chars-forward " \t")
+  (when (or (eobp) (toml:end-of-line-p))
+    (signal 'toml-key-error (list (point)))))
+
 (defun toml:read-value ()
   (toml:seek-readable-point)
   (if (eobp) nil
@@ -1158,6 +1165,7 @@ Example:
               (when full-path
                 (toml:check-inline-table-conflict full-path inline-table-registry)))
 
+            (toml:ensure-value-on-same-line)
             (setq current-value (toml:read-value))
 
             ;; Register inline table paths
