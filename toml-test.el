@@ -1930,3 +1930,17 @@ lt1 = 07:32
   (let ((parsed (toml:read-from-string "a = {b.a = 1, b.c = 2}")))
     (should (equal 1 (cdr (assoc "a" (cdr (assoc "b" (cdr (assoc "a" parsed))))))))
     (should (equal 2 (cdr (assoc "c" (cdr (assoc "b" (cdr (assoc "a" parsed))))))))))
+
+(ert-deftest toml-test:multiline-string-key-rejected ()
+  "Multiline basic/literal strings must not be used as keys."
+  (should-error (toml:read-from-string "\"\"\"key\"\"\" = 1")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "'''key''' = 1")
+                :type 'toml-key-error))
+
+(ert-deftest toml-test:multiline-string-table-key-rejected ()
+  "Multiline basic/literal strings must not be used as table keys."
+  (should-error (toml:read-from-string "[\"\"\"key\"\"\"]")
+                :type 'toml-table-error)
+  (should-error (toml:read-from-string "['''key''']")
+                :type 'toml-table-error))
