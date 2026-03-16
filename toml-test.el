@@ -1930,3 +1930,40 @@ lt1 = 07:32
   (let ((parsed (toml:read-from-string "a = {b.a = 1, b.c = 2}")))
     (should (equal 1 (cdr (assoc "a" (cdr (assoc "b" (cdr (assoc "a" parsed))))))))
     (should (equal 2 (cdr (assoc "c" (cdr (assoc "b" (cdr (assoc "a" parsed))))))))))
+
+(ert-deftest toml-test:multiline-string-key-rejected ()
+  "Multiline basic/literal strings must not be used as keys."
+  (should-error (toml:read-from-string "\"\"\"key\"\"\" = 1")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "'''key''' = 1")
+                :type 'toml-key-error))
+
+(ert-deftest toml-test:multiline-string-table-key-rejected ()
+  "Multiline basic/literal strings must not be used as table keys."
+  (should-error (toml:read-from-string "[\"\"\"key\"\"\"]")
+                :type 'toml-table-error)
+  (should-error (toml:read-from-string "['''key''']")
+                :type 'toml-table-error))
+
+(ert-deftest toml-test:key-without-value-rejected ()
+  "Keys without values must be rejected."
+  (should-error (toml:read-from-string "key = \n")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "key =\n1")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "key =")
+                :type 'toml-key-error))
+
+(ert-deftest toml-test:extra-tokens-after-value-rejected ()
+  "Extra tokens after a key-value pair on the same line must be rejected."
+  (should-error (toml:read-from-string "key = 1 foo")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "key = \"val\" extra")
+                :type 'toml-key-error))
+
+(ert-deftest toml-test:extra-tokens-after-table-header-rejected ()
+  "Extra tokens after a table header on the same line must be rejected."
+  (should-error (toml:read-from-string "[table] foo")
+                :type 'toml-table-error)
+  (should-error (toml:read-from-string "[[array]] bar")
+                :type 'toml-table-error))

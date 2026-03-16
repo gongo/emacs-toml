@@ -721,6 +721,13 @@ Otherwise the NEW value takes precedence."
     (forward-char)
     (nreverse elements)))
 
+(defun toml:ensure-value-on-same-line ()
+  "Ensure that a value starts on the same line after `='.
+Only skips spaces and tabs; signals `toml-key-error' if EOL or EOB."
+  (skip-chars-forward " \t")
+  (when (or (eobp) (toml:end-of-line-p))
+    (signal 'toml-key-error (list (point)))))
+
 (defun toml:read-value ()
   (toml:seek-readable-point)
   (if (eobp) nil
@@ -783,6 +790,10 @@ Behavior differences:
               (signal 'toml-table-error (list (point)))))
           (setq table-keys (nreverse segments))
           (setq table-type (if is-array 'array 'single))
+          ;; After table header, ensure no extra tokens on the same line
+          (skip-chars-forward " \t")
+          (unless (or (eobp) (toml:end-of-line-p) (eq (toml:get-char-at-point) ?#))
+            (signal 'toml-table-error (list (point))))
           ;; Check for table redefinition if checker is provided
           (when (and table-history-checker (eq table-type 'single))
             (funcall table-history-checker table-keys))))
@@ -795,8 +806,14 @@ Returns the key string, or signals toml-table-error."
   (condition-case err
       (cond
        ((eobp) (signal 'toml-table-error (list (point))))
-       ((char-equal (toml:get-char-at-point) ?\") (toml:read-string))
-       ((char-equal (toml:get-char-at-point) ?\') (toml:read-literal-string))
+       ((char-equal (toml:get-char-at-point) ?\")
+        (when (looking-at "\"\"\"")
+          (signal 'toml-table-error (list (point))))
+        (toml:read-string))
+       ((char-equal (toml:get-char-at-point) ?\')
+        (when (looking-at "'''")
+          (signal 'toml-table-error (list (point))))
+        (toml:read-literal-string))
        ((toml:search-forward "\\([A-Za-z0-9_-]+\\)")
         (match-string-no-properties 1))
        (t (signal 'toml-table-error (list (point)))))
@@ -810,8 +827,14 @@ Returns the key string, or nil if at eob or table header."
       (cond
        ((eobp) nil)
        ((char-equal (toml:get-char-at-point) ?\[) nil)
-       ((char-equal (toml:get-char-at-point) ?\") (toml:read-string))
-       ((char-equal (toml:get-char-at-point) ?\') (toml:read-literal-string))
+       ((char-equal (toml:get-char-at-point) ?\")
+        (when (looking-at "\"\"\"")
+          (signal 'toml-key-error (list (point))))
+        (toml:read-string))
+       ((char-equal (toml:get-char-at-point) ?\')
+        (when (looking-at "'''")
+          (signal 'toml-key-error (list (point))))
+        (toml:read-literal-string))
        ((toml:search-forward "\\([A-Za-z0-9_-]+\\)")
         (match-string-no-properties 1))
        (t (signal 'toml-key-error (list (point)))))
@@ -1146,6 +1169,7 @@ Example:
               (when full-path
                 (toml:check-inline-table-conflict full-path inline-table-registry)))
 
+            (toml:ensure-value-on-same-line)
             (setq current-value (toml:read-value))
 
             ;; Register inline table paths
@@ -1176,7 +1200,12 @@ Example:
               (setq hashes (toml:make-table-hashes effective-table
                                                    leaf-key
                                                    current-value
-                                                   hashes))))))
+                                                   hashes)))
+
+            ;; After key-value pair, ensure no extra tokens on the same line
+            (skip-chars-forward " \t")
+            (unless (or (eobp) (toml:end-of-line-p) (eq (toml:get-char-at-point) ?#))
+              (signal 'toml-key-error (list (point)))))))
 
       (toml:seek-readable-point))
     hashes))
