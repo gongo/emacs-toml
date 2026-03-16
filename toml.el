@@ -1145,6 +1145,15 @@ Example:
 
       ;; Validate table doesn't conflict with existing keys
       (when current-table
+        ;; Check all intermediate prefixes for scalar conflicts
+        (let ((prefix nil))
+          (dolist (seg (butlast current-table))
+            (setq prefix (append prefix (list seg)))
+            (when (or (member prefix scalar-key-registry)
+                      (let ((elm (toml:assoc prefix hashes)))
+                        (and elm (not (toml:alistp (cdr elm))))))
+              (signal 'toml-redefine-key-error (list (point))))))
+        ;; Check the full path
         (let ((elm (toml:assoc current-table hashes)))
           (when (and elm (not (toml:alistp (cdr elm))))
             (signal 'toml-redefine-key-error (list (point))))))

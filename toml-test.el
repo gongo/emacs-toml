@@ -1977,3 +1977,8 @@ lt1 = 07:32
   "Dotted key must not redefine a false value as a table."
   (should-error (toml:read-from-string "a = false\na.b = true")
                 :type 'toml-redefine-key-error))
+
+(ert-deftest toml-test-error:overwrite-with-deep-table ()
+  "Table header with deep path must not overwrite a scalar at an intermediate key."
+  (should-error (toml:read-from-string "a=1\n[a.b.c.d]")
+                :type 'toml-redefine-key-error))
