@@ -1053,7 +1053,8 @@ Example:
         hashes
         table-history
         array-table-registry     ; Alist of ("key.path" . last-index)
-        inline-table-registry)   ; List of paths defined by inline tables
+        inline-table-registry    ; List of paths defined by inline tables
+        scalar-key-registry)     ; List of key paths that hold scalar values
     (while (not (eobp))
       (toml:seek-readable-point)
 
@@ -1165,15 +1166,27 @@ Example:
                 (let ((prefix current-table))
                   (dolist (seg dotted-table)
                     (setq prefix (append prefix (list seg)))
-                    (let ((existing (toml:assoc prefix hashes)))
-                      (when (and existing (not (toml:alistp (cdr existing))))
-                        (signal 'toml-redefine-key-error (list (point))))))))
+                    (when (or (member prefix scalar-key-registry)
+                              (let ((existing (toml:assoc prefix hashes)))
+                                (and existing (not (toml:alistp (cdr existing))))))
+                      (signal 'toml-redefine-key-error (list (point)))))))
               ;; Check inline table immutability
               (when full-path
                 (toml:check-inline-table-conflict full-path inline-table-registry)))
 
             (toml:ensure-value-on-same-line)
             (setq current-value (toml:read-value))
+
+            ;; Register scalar key paths (non-alist values)
+            ;; Note: (toml:alistp nil) returns t since nil is an empty list,
+            ;; but false/nil is a scalar value, so we check explicitly.
+            (let ((full-path (if current-array-table
+                                 nil
+                               (append effective-table (list leaf-key)))))
+              (when (and full-path
+                         (or (not (toml:alistp current-value))
+                             (null current-value)))
+                (push full-path scalar-key-registry)))
 
             ;; Register inline table paths
             (when (and (not current-array-table) current-value (toml:alistp current-value))

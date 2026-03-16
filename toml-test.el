@@ -1972,3 +1972,8 @@ lt1 = 07:32
   "Array table [[tbl]] must error if [tbl] was already defined."
   (should-error (toml:read-from-string "[tbl]\n[[tbl]]")
                 :type 'toml-table-error))
+
+(ert-deftest toml-test-error:dotted-redefine-table-false ()
+  "Dotted key must not redefine a false value as a table."
+  (should-error (toml:read-from-string "a = false\na.b = true")
+                :type 'toml-redefine-key-error))
