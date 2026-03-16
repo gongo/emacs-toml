@@ -1091,6 +1091,9 @@ Example:
          ((eq type 'array)
           ;; Check if this array table conflicts with an inline table
           (toml:check-inline-table-conflict keys inline-table-registry)
+          ;; Check if this array table conflicts with an existing single table
+          (when (member keys table-history)
+            (signal 'toml-table-error (list (point))))
           ;; Array of tables
           ;; Check if trying to append to a statically defined array
           (let* ((key-str (mapconcat 'identity keys "."))
