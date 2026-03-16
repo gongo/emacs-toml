@@ -1054,7 +1054,8 @@ Example:
         table-history
         array-table-registry     ; Alist of ("key.path" . last-index)
         inline-table-registry    ; List of paths defined by inline tables
-        scalar-key-registry)     ; List of key paths that hold scalar values
+        scalar-key-registry      ; List of key paths that hold scalar values
+        explicit-table-registry) ; List of key paths explicitly defined by [table] headers
     (while (not (eobp))
       (toml:seek-readable-point)
 
@@ -1066,7 +1067,8 @@ Example:
              (unless (toml:find-parent-array-table keys array-table-registry)
                (when (member keys table-history)
                  (signal 'toml-redefine-table-error (list (point))))
-               (push keys table-history))))
+               (push keys table-history)
+               (push keys explicit-table-registry))))
         (cond
          ((eq type 'single)
           ;; Check if this table conflicts with an inline table
@@ -1209,6 +1211,9 @@ Example:
               (let ((prefix current-table))
                 (dolist (seg dotted-table)
                   (setq prefix (append prefix (list seg)))
+                  ;; Dotted keys must not add to explicitly defined tables
+                  (when (member prefix explicit-table-registry)
+                    (signal 'toml-redefine-table-error (list (point))))
                   (unless (member prefix table-history)
                     (push prefix table-history)))))
 
