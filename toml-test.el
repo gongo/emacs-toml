@@ -756,7 +756,7 @@ aiueo"
 (ert-deftest toml-test:read-inline-table ()
   (toml-test:buffer-setup
    "{}"
-   (should (equal '() (toml:read-inline-table))))
+   (should (eq :toml-empty-table (toml:read-inline-table))))
 
   (toml-test:buffer-setup
    "{ name = \"Tom\" }"
@@ -802,7 +802,7 @@ aiueo"
   ;; Empty table with newline
   (toml-test:buffer-setup
    "{\n}"
-   (should (equal nil (toml:read-inline-table))))
+   (should (eq :toml-empty-table (toml:read-inline-table))))
 
   ;; Single pair with newlines
   (toml-test:buffer-setup
@@ -829,6 +829,31 @@ aiueo"
    "{\n  # comment\n  a = 1\n}"
    (let ((result (toml:read-inline-table)))
      (should (equal 1 (cdr (assoc "a" result)))))))
+
+(ert-deftest toml-test:read-empty-inline-table-semantics ()
+  "Test that empty inline tables are distinct from boolean false."
+  ;; Top-level empty inline table
+  (toml-test:buffer-setup
+   "empty = {}"
+   (let* ((parsed (toml:read))
+          (val (cdr (assoc "empty" parsed))))
+     (should (eq :toml-empty-table val))))
+
+  ;; Nested inline table containing empty
+  (toml-test:buffer-setup
+   "outer = {inner = {}}"
+   (let* ((parsed (toml:read))
+          (outer (cdr (assoc "outer" parsed)))
+          (inner (cdr (assoc "inner" outer))))
+     (should (eq :toml-empty-table inner))))
+
+  ;; Array containing empty inline table
+  (toml-test:buffer-setup
+   "arr = [{}, {a = 1}]"
+   (let* ((parsed (toml:read))
+          (arr (cdr (assoc "arr" parsed))))
+     (should (eq :toml-empty-table (aref arr 0)))
+     (should (equal 1 (cdr (assoc "a" (aref arr 1))))))))
 
 (ert-deftest toml-test:read-from-string-inline-table-multiline ()
   (let ((result (toml:read-from-string "\
@@ -1159,8 +1184,8 @@ name = \"Nail\""
        (should (= 3 (length products)))
        ;; First element has name
        (should (equal "Hammer" (cdr (assoc "name" (aref products 0)))))
-       ;; Second element is empty (nil)
-       (should (null (aref products 1)))
+       ;; Second element is empty table (:toml-empty-table sentinel)
+       (should (eq :toml-empty-table (aref products 1)))
        ;; Third element has name
        (should (equal "Nail" (cdr (assoc "name" (aref products 2)))))))))
 

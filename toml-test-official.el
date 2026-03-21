@@ -49,6 +49,9 @@ See: https://github.com/toml-lang/toml-test/blob/v2.1.0/tests/valid/float/inf-an
   "Convert a parsed TOML VALUE to the tagged format used by toml-test.
 The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
   (cond
+   ;; :toml-empty-table -> empty table (nil alist)
+   ((eq value :toml-empty-table)
+    nil)
    ;; nil/false -> boolean false
    ((eq value nil)
     '(("type" . "bool") ("value" . "false")))
