@@ -1096,7 +1096,7 @@ Example:
           (toml:check-inline-table-conflict keys inline-table-registry)
           ;; Check if this array table conflicts with an existing single table
           (when (member keys table-history)
-            (signal 'toml-table-error (list (point))))
+            (signal 'toml-array-table-error (list (point))))
           ;; Array of tables
           ;; Check if trying to append to a statically defined array
           (let* ((key-str (mapconcat 'identity keys "."))
@@ -1183,17 +1183,14 @@ Example:
                       (signal 'toml-redefine-key-error (list (point)))))))
               ;; Check inline table immutability
               (when full-path
-                (toml:check-inline-table-conflict full-path inline-table-registry)))
+                (toml:check-inline-table-conflict full-path inline-table-registry))
 
-            (toml:ensure-value-on-same-line)
-            (setq current-value (toml:read-value))
+              (toml:ensure-value-on-same-line)
+              (setq current-value (toml:read-value))
 
-            ;; Register scalar key paths (non-alist values)
-            ;; Note: (toml:alistp nil) returns t since nil is an empty list,
-            ;; but false/nil is a scalar value, so we check explicitly.
-            (let ((full-path (if current-array-table
-                                 nil
-                               (append effective-table (list leaf-key)))))
+              ;; Register scalar key paths (non-alist values)
+              ;; Note: (toml:alistp nil) returns t since nil is an empty list,
+              ;; but false/nil is a scalar value, so we check explicitly.
               (when (and full-path
                          (or (not (toml:alistp current-value))
                              (null current-value)))

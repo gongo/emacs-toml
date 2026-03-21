@@ -1253,7 +1253,7 @@ name = \"apple\"
 
 [[fruits]]
 name = \"banana\""
-   (should-error (toml:read) :type 'toml-table-error)))
+   (should-error (toml:read) :type 'toml-array-table-error)))
 
 (ert-deftest toml-test-error:table-conflicts-with-array-table ()
   "Test that table conflicts with existing array table."
@@ -1971,7 +1971,7 @@ lt1 = 07:32
 (ert-deftest toml-test-error:array-table-conflicts-with-single-table ()
   "Array table [[tbl]] must error if [tbl] was already defined."
   (should-error (toml:read-from-string "[tbl]\n[[tbl]]")
-                :type 'toml-table-error))
+                :type 'toml-array-table-error))
 
 (ert-deftest toml-test-error:dotted-redefine-table-false ()
   "Dotted key must not redefine a false value as a table."
