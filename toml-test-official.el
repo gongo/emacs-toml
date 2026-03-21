@@ -49,6 +49,9 @@ See: https://github.com/toml-lang/toml-test/blob/v2.1.0/tests/valid/float/inf-an
   "Convert a parsed TOML VALUE to the tagged format used by toml-test.
 The toml-test format uses {\"type\": TYPE, \"value\": VALUE} for scalars."
   (cond
+   ;; :toml-empty-table -> empty table (nil alist)
+   ((eq value :toml-empty-table)
+    nil)
    ;; nil/false -> boolean false
    ((eq value nil)
     '(("type" . "bool") ("value" . "false")))
@@ -168,9 +171,8 @@ E.g. \"...56.600Z\" -> \"...56.6Z\", \"...00.5-07:00\" -> unchanged."
                      exp-val act-val (concat path "." key))
               (cl-return nil))))
         t)))
-   ;; Both are lists (arrays)
-   ((and (listp expected) (listp actual)
-         (not (and expected (consp (car expected)))))
+   ;; Both are lists (arrays / array-of-tables)
+   ((and (listp expected) (listp actual))
     (if (= (length expected) (length actual))
         (let ((idx 0) (result t))
           (while (and result (< idx (length expected)))

@@ -212,6 +212,11 @@ Example:
           (throw 'break nil)))
       element)))
 
+(defsubst toml:array-table-elem (elem)
+  "Return ELEM as an alist for array table operations.
+Converts the :toml-empty-table sentinel to nil (empty alist)."
+  (if (eq elem :toml-empty-table) nil elem))
+
 (defun toml:alistp (alist)
   "Return t if ALIST is a list of association lists, nil otherwise."
   (when (listp alist)
@@ -694,7 +699,7 @@ Otherwise the NEW value takes precedence."
               (unless (member prefix implicit-paths)
                 (push prefix implicit-paths)))))
         ;; Register inline table value paths
-        (when (toml:alistp value)
+        (when (or (toml:alistp value) (eq value :toml-empty-table))
           (push full-path inline-table-paths))
         ;; Build elements
         (if (= 1 (length key-segments))
@@ -719,7 +724,7 @@ Otherwise the NEW value takes precedence."
               (toml:seek-readable-point))
           (signal 'toml-inline-table-error (list (point))))))
     (forward-char)
-    (nreverse elements)))
+    (if elements (nreverse elements) :toml-empty-table)))
 
 (defun toml:ensure-value-on-same-line ()
   "Ensure that a value starts on the same line after `='.
@@ -909,15 +914,13 @@ Example:
   (let ((result nil)
         (prefix nil)
         (keys-len (length keys)))
-    (catch 'found
-      (dolist (key keys)
-        (setq prefix (append prefix (list key)))
-        ;; Only consider proper prefixes (not the full path)
-        (when (< (length prefix) keys-len)
-          (let ((key-str (mapconcat 'identity prefix ".")))
-            (when (assoc key-str array-table-registry)
-              (setq result prefix)
-              (throw 'found result))))))
+    (dolist (key keys)
+      (setq prefix (append prefix (list key)))
+      ;; Only consider proper prefixes (not the full path)
+      (when (< (length prefix) keys-len)
+        (let ((key-str (mapconcat 'identity prefix ".")))
+          (when (assoc key-str array-table-registry)
+            (setq result (copy-sequence prefix))))))
     result))
 
 (defun toml:make-array-table-hashes (array-keys hashes &optional parent-array-context)
@@ -947,7 +950,7 @@ Example:
                (parent-entry (assoc (car parent-keys) hashes))
                (parent-array (cdr parent-entry)))
           (when (and parent-array (vectorp parent-array))
-            (let* ((last-elem (aref parent-array parent-index))
+            (let* ((last-elem (toml:array-table-elem (aref parent-array parent-index)))
                    (updated-elem (toml:make-array-table-hashes
                                   array-keys last-elem nil)))
               (aset parent-array parent-index updated-elem)))
@@ -959,12 +962,12 @@ Example:
               (if (vectorp current-val)
                   ;; Extend existing array with new empty element
                   (progn
-                    (setcdr existing (vconcat current-val (vector nil)))
+                    (setcdr existing (vconcat current-val (vector :toml-empty-table)))
                     hashes)
                 ;; Conflict: trying to redefine non-array as array table
                 (signal 'toml-array-table-error (list (point)))))
           ;; Create new array with one empty element
-          (cons (cons key (vector nil)) hashes)))
+          (cons (cons key (vector :toml-empty-table)) hashes)))
        ;; More keys to traverse - recurse
        (t
         (let* ((children (if existing (cdr existing) nil))
@@ -982,16 +985,16 @@ Returns updated hashes."
   (let* ((parent-entry (toml:assoc parent-keys hashes))
          (parent-array (cdr parent-entry)))
     (when (and parent-array (vectorp parent-array))
-      (let* ((current-elem (aref parent-array parent-index))
+      (let* ((current-elem (toml:array-table-elem (aref parent-array parent-index)))
              (child-key (car child-keys))
              (existing-child (assoc child-key current-elem)))
         (if existing-child
             ;; Extend existing nested array
             (let ((child-array (cdr existing-child)))
               (when (vectorp child-array)
-                (setcdr existing-child (vconcat child-array (vector nil)))))
+                (setcdr existing-child (vconcat child-array (vector :toml-empty-table)))))
           ;; Create new nested array
-          (let ((new-elem (cons (cons child-key (vector nil)) current-elem)))
+          (let ((new-elem (cons (cons child-key (vector :toml-empty-table)) current-elem)))
             (aset parent-array parent-index new-elem)))))
     hashes))
 
@@ -1021,7 +1024,7 @@ Example:
                (parent-entry (toml:assoc parent-array hashes))
                (parent-vec (cdr parent-entry)))
           (when (and parent-vec (vectorp parent-vec) parent-index)
-            (let* ((parent-elem (aref parent-vec parent-index))
+            (let* ((parent-elem (toml:array-table-elem (aref parent-vec parent-index)))
                    (child-keys (nthcdr (length parent-array) array-keys))
                    (child-key (car child-keys))
                    (child-entry (assoc child-key parent-elem))
@@ -1029,7 +1032,7 @@ Example:
                    (child-key-str (mapconcat 'identity array-keys "."))
                    (child-index (cdr (assoc child-key-str array-registry))))
               (when (and child-array (vectorp child-array) child-index)
-                (let* ((current-elem (aref child-array child-index))
+                (let* ((current-elem (toml:array-table-elem (aref child-array child-index)))
                        (updated-elem (toml:make-table-hashes sub-keys key value current-elem)))
                   (aset child-array child-index updated-elem))))))
       ;; Top-level array table
@@ -1038,7 +1041,7 @@ Example:
              (entry (toml:assoc array-keys hashes))
              (array-vec (cdr entry)))
         (when (and array-vec (vectorp array-vec) index)
-          (let* ((current-elem (aref array-vec index))
+          (let* ((current-elem (toml:array-table-elem (aref array-vec index)))
                  (updated-elem (toml:make-table-hashes sub-keys key value current-elem)))
             (aset array-vec index updated-elem)))))
     hashes))
@@ -1191,16 +1194,21 @@ Example:
               ;; Register scalar key paths (non-alist values)
               ;; Note: (toml:alistp nil) returns t since nil is an empty list,
               ;; but false/nil is a scalar value, so we check explicitly.
+              ;; :toml-empty-table is an empty table, not a scalar.
               (when (and full-path
+                         (not (eq current-value :toml-empty-table))
                          (or (not (toml:alistp current-value))
                              (null current-value)))
                 (push full-path scalar-key-registry)))
 
             ;; Register inline table paths
-            (when (and (not current-array-table) current-value (toml:alistp current-value))
+            (when (and (not current-array-table) current-value
+                       (or (toml:alistp current-value) (eq current-value :toml-empty-table)))
               (let ((base-path (append effective-table (list leaf-key))))
-                (dolist (path (toml:collect-inline-table-paths base-path current-value))
-                  (push path inline-table-registry))))
+                (if (eq current-value :toml-empty-table)
+                    (push base-path inline-table-registry)
+                  (dolist (path (toml:collect-inline-table-paths base-path current-value))
+                    (push path inline-table-registry)))))
 
             ;; Register dotted-key-defined implicit tables in table-history
             ;; to prevent [table] headers from reopening them (TOML v1.0.0)
