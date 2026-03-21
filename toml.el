@@ -631,6 +631,7 @@ Move point to the end of read string."
     (signal 'toml-array-error (list (point))))
   (mark-sexp)
   (forward-char)
+  (toml:seek-readable-point)
   (let (elements-list char-after-read)
     (while (not (char-equal (toml:get-char-at-point) ?\]))
       (push (toml:read-value) elements-list)

@@ -753,6 +753,12 @@ aiueo"
 
   )
 
+(ert-deftest toml-test:read-array-multiline-after-bracket ()
+  (let ((parsed (toml:read-from-string "a = [\n]")))
+    (should (equal (cdr (assoc "a" parsed)) [])))
+  (let ((parsed (toml:read-from-string "a = { a = [\n]}")))
+    (should (equal (cdr (assoc "a" (cdr (assoc "a" parsed)))) []))))
+
 (ert-deftest toml-test:read-inline-table ()
   (toml-test:buffer-setup
    "{}"
