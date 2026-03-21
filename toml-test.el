@@ -2017,3 +2017,91 @@ lt1 = 07:32
   "Dotted keys must not add to an explicitly defined deep table."
   (should-error (toml:read-from-string "[a.b.c.d]\nz = 9\n\n[a]\nb.c.d.k.t = \"x\"")
                 :type 'toml-redefine-table-error))
+
+;;; --- Encoding validation tests ---
+
+(defun toml-test:write-unibyte-file (file &rest bytes)
+  "Write raw BYTES to FILE as a unibyte file."
+  (with-temp-buffer
+    (set-buffer-multibyte nil)
+    (apply #'insert bytes)
+    (let ((coding-system-for-write 'binary))
+      (write-region (point-min) (point-max) file nil 'silent))))
+
+(ert-deftest toml-test-error:encoding-utf16-bom ()
+  "UTF-16 BOM should be rejected."
+  (let ((file (make-temp-file "toml-test-" nil ".toml")))
+    (unwind-protect
+        (progn
+          (toml-test:write-unibyte-file file #xFE #xFF #x00 #x23)
+          (should-error (toml:read-from-file file)
+                        :type 'toml-encoding-error))
+      (delete-file file))))
+
+(ert-deftest toml-test-error:encoding-bad-utf8-truncated ()
+  "Truncated UTF-8 sequence should be rejected."
+  (let ((file (make-temp-file "toml-test-" nil ".toml")))
+    (unwind-protect
+        (progn
+          (toml-test:write-unibyte-file file ?# ?\s #xC3 ?\n)
+          (should-error (toml:read-from-file file)
+                        :type 'toml-encoding-error))
+      (delete-file file))))
+
+(ert-deftest toml-test-error:encoding-surrogate-codepoint ()
+  "Surrogate codepoint U+D800 in raw bytes should be rejected."
+  (let ((file (make-temp-file "toml-test-" nil ".toml")))
+    (unwind-protect
+        (progn
+          (toml-test:write-unibyte-file file ?# ?\s #xED #xA0 #x80 ?\n)
+          (should-error (toml:read-from-file file)
+                        :type 'toml-encoding-error))
+      (delete-file file))))
+
+(ert-deftest toml-test-error:encoding-bad-utf8-in-string ()
+  "Invalid UTF-8 in basic string should be rejected."
+  (let ((file (make-temp-file "toml-test-" nil ".toml")))
+    (unwind-protect
+        (progn
+          (toml-test:write-unibyte-file file ?b ?a ?d ?\s ?= ?\s ?\" #xC3 ?\" ?\n)
+          (should-error (toml:read-from-file file)
+                        :type 'toml-encoding-error))
+      (delete-file file))))
+
+(ert-deftest toml-test:encoding-valid-utf8 ()
+  "Valid UTF-8 multibyte characters should parse fine."
+  (let ((file (make-temp-file "toml-test-" nil ".toml")))
+    (unwind-protect
+        (progn
+          (with-temp-file file
+            (insert "key = \"日本語\"\n"))
+          (let ((result (toml:read-from-file file)))
+            (should (equal (cdr (assoc "key" result)) "日本語"))))
+      (delete-file file))))
+
+(ert-deftest toml-test:encoding-utf8-bom-valid ()
+  "UTF-8 BOM at file start should be accepted and stripped."
+  (let ((file (make-temp-file "toml-test-" nil ".toml")))
+    (unwind-protect
+        (progn
+          (toml-test:write-unibyte-file
+           file #xEF #xBB #xBF  ;; UTF-8 BOM
+           ?k ?e ?y ?\s ?= ?\s ?\" ?a ?\" ?\n)
+          (let ((result (toml:read-from-file file)))
+            (should (equal (cdr (assoc "key" result)) "a"))))
+      (delete-file file))))
+
+(ert-deftest toml-test-error:encoding-bom-not-at-start ()
+  "BOM bytes not at file start should cause an error."
+  (let ((file (make-temp-file "toml-test-" nil ".toml")))
+    (unwind-protect
+        (progn
+          (toml-test:write-unibyte-file
+           file ?# ?\s ?c ?o ?m ?m ?e ?n ?t ?\n
+           #xEF #xBB #xBF  ;; BOM in middle of file
+           ?k ?e ?y ?\s ?= ?\s ?\" ?a ?\" ?\n)
+          ;; BOM at non-zero offset is valid UTF-8 (U+FEFF), but
+          ;; the parser rejects U+FEFF as an invalid key character.
+          (should-error (toml:read-from-file file)
+                        :type 'toml-error))
+      (delete-file file))))
