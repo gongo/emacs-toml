@@ -6,7 +6,7 @@ emacs-toml
 `toml.el` is a library for parsing TOML (Tom's Obvious, Minimal Language).
 
 * Learn all about TOML here: https://github.com/mojombo/toml
-* Support version: [v1.0.0](https://github.com/toml-lang/toml/blob/main/CHANGELOG.md#100--2021-01-11)
+* Support version: [v1.1.0](https://github.com/toml-lang/toml/releases/tag/1.1.0)
 
 ## Versioning
 
@@ -100,14 +100,6 @@ hosts = \[
 ;;       ("title" . "TOML Example"))
 ```
 
-## Spec
-
-In `emacs-toml`, "key groups" and "key" key pattern are as follows:
-
-* `key` = `[a-zA-Z][a-zA-Z0-9_]*`
-* `keygroup` = `[a-zA-Z][a-zA-Z0-9_\\.]*`
-    * The end doesn't end in the period.
-
 ## Test
 
 ### Unit Tests
@@ -121,8 +113,6 @@ make test
 ### Official Test Suite
 
 This project also includes tests using the official [toml-lang/toml-test](https://github.com/toml-lang/toml-test) suite as a git submodule.
-
-**Note:** Since `emacs-toml` currently supports TOML v1.0.0, some tests from the official suite (which targets TOML v1.1.0) may fail. This is expected.
 
 To run the official test suite:
 
