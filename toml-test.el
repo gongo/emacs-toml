@@ -753,6 +753,12 @@ aiueo"
 
   )
 
+(ert-deftest toml-test:read-array-multiline-after-bracket ()
+  (let ((parsed (toml:read-from-string "a = [\n]")))
+    (should (equal (cdr (assoc "a" parsed)) [])))
+  (let ((parsed (toml:read-from-string "a = { a = [\n]}")))
+    (should (equal (cdr (assoc "a" (cdr (assoc "a" parsed)))) []))))
+
 (ert-deftest toml-test:read-inline-table ()
   (toml-test:buffer-setup
    "{}"
@@ -1977,6 +1983,10 @@ lt1 = 07:32
   (should-error (toml:read-from-string "key =\n1")
                 :type 'toml-key-error)
   (should-error (toml:read-from-string "key =")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "key = # INVALID")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "key =\t# INVALID")
                 :type 'toml-key-error))
 
 (ert-deftest toml-test:extra-tokens-after-value-rejected ()
