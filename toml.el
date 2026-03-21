@@ -1053,7 +1053,9 @@ Example:
         hashes
         table-history
         array-table-registry     ; Alist of ("key.path" . last-index)
-        inline-table-registry)   ; List of paths defined by inline tables
+        inline-table-registry    ; List of paths defined by inline tables
+        scalar-key-registry      ; List of key paths that hold scalar values
+        explicit-table-registry) ; List of key paths explicitly defined by [table] headers
     (while (not (eobp))
       (toml:seek-readable-point)
 
@@ -1065,7 +1067,8 @@ Example:
              (unless (toml:find-parent-array-table keys array-table-registry)
                (when (member keys table-history)
                  (signal 'toml-redefine-table-error (list (point))))
-               (push keys table-history))))
+               (push keys table-history)
+               (push keys explicit-table-registry))))
         (cond
          ((eq type 'single)
           ;; Check if this table conflicts with an inline table
@@ -1091,6 +1094,9 @@ Example:
          ((eq type 'array)
           ;; Check if this array table conflicts with an inline table
           (toml:check-inline-table-conflict keys inline-table-registry)
+          ;; Check if this array table conflicts with an existing single table
+          (when (member keys table-history)
+            (signal 'toml-array-table-error (list (point))))
           ;; Array of tables
           ;; Check if trying to append to a statically defined array
           (let* ((key-str (mapconcat 'identity keys "."))
@@ -1141,6 +1147,15 @@ Example:
 
       ;; Validate table doesn't conflict with existing keys
       (when current-table
+        ;; Check all intermediate prefixes for scalar conflicts
+        (let ((prefix nil))
+          (dolist (seg (butlast current-table))
+            (setq prefix (append prefix (list seg)))
+            (when (or (member prefix scalar-key-registry)
+                      (let ((elm (toml:assoc prefix hashes)))
+                        (and elm (not (toml:alistp (cdr elm))))))
+              (signal 'toml-redefine-key-error (list (point))))))
+        ;; Check the full path
         (let ((elm (toml:assoc current-table hashes)))
           (when (and elm (not (toml:alistp (cdr elm))))
             (signal 'toml-redefine-key-error (list (point))))))
@@ -1162,15 +1177,24 @@ Example:
                 (let ((prefix current-table))
                   (dolist (seg dotted-table)
                     (setq prefix (append prefix (list seg)))
-                    (let ((existing (toml:assoc prefix hashes)))
-                      (when (and existing (not (toml:alistp (cdr existing))))
-                        (signal 'toml-redefine-key-error (list (point))))))))
+                    (when (or (member prefix scalar-key-registry)
+                              (let ((existing (toml:assoc prefix hashes)))
+                                (and existing (not (toml:alistp (cdr existing))))))
+                      (signal 'toml-redefine-key-error (list (point)))))))
               ;; Check inline table immutability
               (when full-path
-                (toml:check-inline-table-conflict full-path inline-table-registry)))
+                (toml:check-inline-table-conflict full-path inline-table-registry))
 
-            (toml:ensure-value-on-same-line)
-            (setq current-value (toml:read-value))
+              (toml:ensure-value-on-same-line)
+              (setq current-value (toml:read-value))
+
+              ;; Register scalar key paths (non-alist values)
+              ;; Note: (toml:alistp nil) returns t since nil is an empty list,
+              ;; but false/nil is a scalar value, so we check explicitly.
+              (when (and full-path
+                         (or (not (toml:alistp current-value))
+                             (null current-value)))
+                (push full-path scalar-key-registry)))
 
             ;; Register inline table paths
             (when (and (not current-array-table) current-value (toml:alistp current-value))
@@ -1184,6 +1208,9 @@ Example:
               (let ((prefix current-table))
                 (dolist (seg dotted-table)
                   (setq prefix (append prefix (list seg)))
+                  ;; Dotted keys must not add to explicitly defined tables
+                  (when (member prefix explicit-table-registry)
+                    (signal 'toml-redefine-table-error (list (point))))
                   (unless (member prefix table-history)
                     (push prefix table-history)))))
 

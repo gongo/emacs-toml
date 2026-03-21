@@ -1967,3 +1967,28 @@ lt1 = 07:32
                 :type 'toml-table-error)
   (should-error (toml:read-from-string "[[array]] bar")
                 :type 'toml-table-error))
+
+(ert-deftest toml-test-error:array-table-conflicts-with-single-table ()
+  "Array table [[tbl]] must error if [tbl] was already defined."
+  (should-error (toml:read-from-string "[tbl]\n[[tbl]]")
+                :type 'toml-array-table-error))
+
+(ert-deftest toml-test-error:dotted-redefine-table-false ()
+  "Dotted key must not redefine a false value as a table."
+  (should-error (toml:read-from-string "a = false\na.b = true")
+                :type 'toml-redefine-key-error))
+
+(ert-deftest toml-test-error:overwrite-with-deep-table ()
+  "Table header with deep path must not overwrite a scalar at an intermediate key."
+  (should-error (toml:read-from-string "a=1\n[a.b.c.d]")
+                :type 'toml-redefine-key-error))
+
+(ert-deftest toml-test-error:append-with-dotted-keys-01 ()
+  "Dotted keys must not add to an explicitly defined table."
+  (should-error (toml:read-from-string "[a.b.c]\nz = 9\n\n[a]\nb.c.t = \"x\"")
+                :type 'toml-redefine-table-error))
+
+(ert-deftest toml-test-error:append-with-dotted-keys-02 ()
+  "Dotted keys must not add to an explicitly defined deep table."
+  (should-error (toml:read-from-string "[a.b.c.d]\nz = 9\n\n[a]\nb.c.d.k.t = \"x\"")
+                :type 'toml-redefine-table-error))
