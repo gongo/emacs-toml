@@ -197,6 +197,10 @@ Excludes \\uXXXX which is handled separately in `toml:read-escaped-char'.")
 (put 'toml-inline-table-immutable-error 'error-conditions
      '(toml-inline-table-immutable-error toml-error error))
 
+(put 'toml-encoding-error 'error-message "Bad encoding")
+(put 'toml-encoding-error 'error-conditions
+     '(toml-encoding-error toml-error error))
+
 (defun toml:assoc (keys hash)
   "Look up nested KEYS in HASH and return the found element.
 
@@ -1245,18 +1249,126 @@ Example:
       (toml:seek-readable-point))
     hashes))
 
+(defun toml:--validate-string-characters ()
+  "Check for raw-byte characters in the current multibyte buffer.
+Signals `toml-encoding-error' if problematic characters are found.
+This provides best-effort validation for `toml:read-from-string'."
+  (save-excursion
+    (goto-char (point-min))
+    (while (not (eobp))
+      (let ((ch (char-after)))
+        (when (and (>= ch #x3FFF80) (<= ch #x3FFFFF))
+          (signal 'toml-encoding-error
+                  (list (format "Raw byte character at pos %d" (point))))))
+      (forward-char 1))))
+
 (defun toml:read-from-string (string)
   "Read the TOML object contained in STRING and return it."
   (with-temp-buffer
     (insert string)
+    (toml:--validate-string-characters)
     (toml:--normalize-newlines)
     (goto-char (point-min))
     (toml:read)))
 
+(defun toml:--expect-continuation-bytes (n)
+  "Advance past a multi-byte UTF-8 sequence expecting N continuation bytes.
+Point should be on the leading byte.  Signals `toml-encoding-error'
+if any continuation byte is missing or invalid (not 10xxxxxx)."
+  (let ((start (point)))
+    (forward-char 1)
+    (dotimes (_ n)
+      (if (eobp)
+          (signal 'toml-encoding-error
+                  (list (format "Truncated UTF-8 sequence starting at pos %d" start)))
+        (let ((b (char-after)))
+          (unless (and (>= b #x80) (<= b #xBF))
+            (signal 'toml-encoding-error
+                    (list (format "Invalid continuation byte 0x%02X at pos %d"
+                                  b (point)))))
+          (forward-char 1))))))
+
+(defun toml:--validate-utf8-bytes ()
+  "Validate that the current unibyte buffer contains well-formed UTF-8.
+Signals `toml-encoding-error' if invalid bytes are found.
+Must be called in a unibyte buffer (e.g., read with `binary').
+
+Why manual byte validation instead of Emacs built-in functions:
+- `detect-coding-string': An encoding guesser, not a validator.
+  It cannot reliably reject invalid UTF-8 (e.g., surrogate 0xED 0xA0 0x80
+  may be guessed as `utf-8'; results vary by environment).
+- `decode-coding-string'/`decode-coding-region' with `utf-8': Does not
+  signal errors on invalid input.  Instead, it silently converts bad bytes
+  to raw-byte characters (#x3FFF80-#x3FFFFF).  This catches most cases,
+  but surrogate codepoints (U+D800-U+DFFF) are decoded as normal
+  characters (e.g., 0xED 0xA0 0x80 → U+D800), not raw-bytes.
+- `check-coding-systems-region': Returns nil (= OK) for all invalid
+  UTF-8 patterns tested, providing no validation."
+  (goto-char (point-min))
+  ;; Check for UTF-16 BOM
+  (when (>= (buffer-size) 2)
+    (let ((b0 (char-after (point-min)))
+          (b1 (char-after (1+ (point-min)))))
+      (when (or (and (= b0 #xFE) (= b1 #xFF))
+                (and (= b0 #xFF) (= b1 #xFE)))
+        (signal 'toml-encoding-error (list "UTF-16 BOM detected")))))
+  ;; Skip UTF-8 BOM at file start only
+  (when (and (>= (buffer-size) 3)
+             (= (char-after (point-min)) #xEF)
+             (= (char-after (+ (point-min) 1)) #xBB)
+             (= (char-after (+ (point-min) 2)) #xBF))
+    (goto-char (+ (point-min) 3)))
+  ;; Walk through bytes validating UTF-8 sequences
+  (while (not (eobp))
+    (let ((byte (char-after)))
+      (cond
+       ;; ASCII: 0x00-0x7F
+       ((<= byte #x7F)
+        (forward-char 1))
+       ;; 2-byte: 0xC2-0xDF
+       ((and (>= byte #xC2) (<= byte #xDF))
+        (toml:--expect-continuation-bytes 1))
+       ;; 3-byte: 0xE0-0xEF
+       ((and (>= byte #xE0) (<= byte #xEF))
+        (let ((b1 (char-after (1+ (point)))))
+          ;; 0xE0: reject overlong (second byte must be >= 0xA0)
+          (when (and (= byte #xE0) b1 (< b1 #xA0))
+            (signal 'toml-encoding-error
+                    (list (format "Overlong 3-byte sequence at pos %d" (point)))))
+          ;; 0xED: reject surrogates U+D800-U+DFFF (second byte must be < 0xA0)
+          (when (and (= byte #xED) b1 (>= b1 #xA0))
+            (signal 'toml-encoding-error
+                    (list (format "Surrogate codepoint at pos %d" (point))))))
+        (toml:--expect-continuation-bytes 2))
+       ;; 4-byte: 0xF0-0xF4
+       ((and (>= byte #xF0) (<= byte #xF4))
+        (let ((b1 (char-after (1+ (point)))))
+          ;; 0xF0: reject overlong (second byte must be >= 0x90)
+          (when (and (= byte #xF0) b1 (< b1 #x90))
+            (signal 'toml-encoding-error
+                    (list (format "Overlong 4-byte sequence at pos %d" (point)))))
+          ;; 0xF4: reject > U+10FFFF (second byte must be <= 0x8F)
+          (when (and (= byte #xF4) b1 (> b1 #x8F))
+            (signal 'toml-encoding-error
+                    (list (format "Codepoint > U+10FFFF at pos %d" (point))))))
+        (toml:--expect-continuation-bytes 3))
+       ;; Invalid leading byte (0x80-0xBF, 0xC0-0xC1, 0xF5-0xFF)
+       (t
+        (signal 'toml-encoding-error
+                (list (format "Invalid UTF-8 byte 0x%02X at pos %d"
+                              byte (point)))))))))
+
 (defun toml:read-from-file (file)
   "Read the TOML object contained in FILE and return it."
   (with-temp-buffer
-    (insert-file-contents file)
+    ;; Phase 1: Read as raw bytes and validate UTF-8
+    (set-buffer-multibyte nil)
+    (let ((coding-system-for-read 'binary))
+      (insert-file-contents file))
+    (toml:--validate-utf8-bytes)
+    ;; Phase 2: Convert to multibyte and parse
+    (decode-coding-region (point-min) (point-max) 'utf-8-with-signature)
+    (set-buffer-multibyte t)
     (toml:--normalize-newlines)
     (goto-char (point-min))
     (toml:read)))
