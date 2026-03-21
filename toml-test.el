@@ -1983,6 +1983,10 @@ lt1 = 07:32
   (should-error (toml:read-from-string "key =\n1")
                 :type 'toml-key-error)
   (should-error (toml:read-from-string "key =")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "key = # INVALID")
+                :type 'toml-key-error)
+  (should-error (toml:read-from-string "key =\t# INVALID")
                 :type 'toml-key-error))
 
 (ert-deftest toml-test:extra-tokens-after-value-rejected ()

@@ -735,7 +735,9 @@ Otherwise the NEW value takes precedence."
   "Ensure that a value starts on the same line after `='.
 Only skips spaces and tabs; signals `toml-key-error' if EOL or EOB."
   (skip-chars-forward " \t")
-  (when (or (eobp) (toml:end-of-line-p))
+  (when (or (eobp)
+	    (toml:end-of-line-p)
+            (char-equal (toml:get-char-at-point) ?#))
     (signal 'toml-key-error (list (point)))))
 
 (defun toml:read-value ()
