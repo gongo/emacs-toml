@@ -6,7 +6,7 @@ emacs-toml
 `toml.el` is a library for parsing TOML (Tom's Obvious, Minimal Language).
 
 * Learn all about TOML here: https://github.com/mojombo/toml
-* Support version: [v1.1.0](https://github.com/toml-lang/toml/releases/tag/1.1.0)
+* Supported version: [v1.1.0](https://github.com/toml-lang/toml/releases/tag/1.1.0)
 
 ## Versioning
 
@@ -16,6 +16,35 @@ emacs-toml uses the version format `x.y.z.N`.
 - `.N` — The release number of emacs-toml itself. This number increments when there are changes to emacs-toml (bug fixes, internal improvements, etc.) without a change in the supported TOML specification version.
 
 For example, `1.0.0.0` is the initial release supporting TOML v1.0.0, and `1.0.0.1` would be the first patch release with bug fixes or improvements.
+
+## Type Mapping
+
+| TOML type | Emacs Lisp | Example |
+|---|---|---|
+| String | `string` | `"foo"` → `"foo"` |
+| Integer | `integer` | `42` → `42` |
+| Float | `float` | `3.14` → `3.14` |
+| Boolean (`true`) | `t` | `true` → `t` |
+| Boolean (`false`) | `nil` | `false` → `nil` |
+| Offset Date-Time | alist | `1979-05-27T07:32:00Z` → `((year . 1979) (month . 5) ...)` |
+| Local Date-Time | alist | `1979-05-27T07:32:00` → `((year . 1979) (month . 5) ...)` |
+| Local Date | alist | `1979-05-27` → `((year . 1979) (month . 5) (day . 27))` |
+| Local Time | alist | `07:32:00` → `((hour . 7) (minute . 32) (second . 0) ...)` |
+| Array | vector | `[1, 2]` → `[1 2]` |
+| Empty Array | `[]` (empty vector) | `[]` → `[]` |
+| Table | alist | `{a = 1}` → `(("a" . 1))` |
+| Empty Table | `:toml-empty-table` | `{}` → `:toml-empty-table` |
+| Array of Tables | vector of alists (or `:toml-empty-table` for empty elements) | `[[products]]` ... → `[(("name" . "Hammer")) ...]` |
+| `inf`, `+inf` | `1.0e+INF` | `inf` → `1.0e+INF` |
+| `-inf` | `-1.0e+INF` | `-inf` → `-1.0e+INF` |
+| `nan`, `+nan` | `0.0e+NaN` | `nan` → `0.0e+NaN` |
+| `-nan` | `-0.0e+NaN` | `-nan` → `-0.0e+NaN` |
+
+> [!NOTE]
+> Empty tables (`{}`) are represented as the `:toml-empty-table` symbol to distinguish them from `nil`. See [#103](https://github.com/gongo/emacs-toml/pull/103) for background.
+
+> [!NOTE]
+> Datetime alist keys vary by type: `timezone` is present only in Offset Date-Time, and `fraction` is included in date/time types.
 
 ## Example
 
